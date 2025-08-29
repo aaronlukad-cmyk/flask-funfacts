@@ -106,7 +106,7 @@ HTML = """
     </aside>
   </main>
 
-  <footer>Made with Flask · Uhrzeit + Datum + Fun Facts ✨</footer>
+  <footer>Made by aaron</footer>
 
   <script>
     const clockEl = document.getElementById('clock');
@@ -192,4 +192,5 @@ if __name__ == "__main__":
     import os
     port = int(os.environ.get("PORT", 5000))  # Render gibt PORT vor
     app.run(host="0.0.0.0", port=port, debug=False)
+
 
