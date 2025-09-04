@@ -146,7 +146,7 @@ HTML = r"""
     <!-- TicTacToe -->
     <div class="card" style="margin-top:16px">
       <h3 style="margin-top:0">🎮 Mini-Game: Tic-Tac-Toe</h3>
-      <div class="center muted" id="ttt-status">Du bist X. Viel Spaß!</div>
+      <div class="center muted" id="ttt-status">Du bist X. Computer ist O.</div>
       <div class="ttt" id="ttt"></div>
       <div class="center" style="margin-top:10px">
         <button class="btn" id="ttt-reset">Neu starten</button>
@@ -245,62 +245,114 @@ HTML = r"""
     document.body.appendChild(n); setTimeout(()=>n.remove(), 1600);
   }
 
-  // TicTacToe
+  // ─────────────────────────────────────────────────────────────────────────
+  // TicTacToe – starker Computer (O) via Minimax
+  // ─────────────────────────────────────────────────────────────────────────
   const ttt = document.getElementById('ttt');
-  let board = Array(9).fill(''); let current = 'X'; let lock=false;
+  let board = Array(9).fill('');
+  const HUMAN = 'X', AI = 'O';
   const wins = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+  let lock = false;
+
   function draw(){
     ttt.innerHTML='';
     board.forEach((val,i)=>{
-      const b = document.createElement('button'); b.textContent = val;
-      b.addEventListener('click', ()=>move(i));
+      const b = document.createElement('button');
+      b.textContent = val;
+      b.addEventListener('click', ()=>humanMove(i));
       ttt.appendChild(b);
     });
   }
-  function move(i){
-    if(lock || board[i]) return;
-    board[i] = current; draw();
-    const w = winner(); if(w){ endGame(w); return; }
-    if(board.every(v=>v)) { endGame('draw'); return; }
-    current = current==='X' ? 'O':'X';
-    document.getElementById('ttt-status').textContent = `Du bist ${current}. Viel Spaß!`;
-  }
-  function winner(){
-    for(const [a,b,c] of wins){ if(board[a] && board[a]===board[b] && board[b]===board[c]) return [a,b,c]; }
+
+  function emptyIndices(b){ return b.map((v,i)=>v===''?i:null).filter(i=>i!==null); }
+  function winnerOf(b){
+    for(const [a,b2,c] of wins){ if(b[a] && b[a]===b[b2] && b[b2]===b[c]) return b[a]; }
     return null;
   }
+  function winningLine(b){
+    for(const line of wins){ const [a,b2,c]=line; if(b[a] && b[a]===b[b2] && b[b2]===b[c]) return line; }
+    return null;
+  }
+
   function endGame(res){
     lock = true;
     if(res==='draw'){ document.getElementById('ttt-status').textContent = 'Unentschieden!'; return; }
-    document.getElementById('ttt-status').textContent = `${board[res[0]]} gewinnt!`;
-    [...ttt.children].forEach((btn,i)=>{ if(res.includes(i)) btn.classList.add('win'); });
+    const line = winningLine(board) || [];
+    document.getElementById('ttt-status').textContent = `${res} gewinnt!`;
+    [...ttt.children].forEach((btn,i)=>{ if(line.includes(i)) btn.classList.add('win'); });
   }
-  document.getElementById('ttt-reset').addEventListener('click', ()=>{ board = Array(9).fill(''); current='X'; lock=false; draw(); document.getElementById('ttt-status').textContent='Du bist X. Viel Spaß!'; });
+
+  function humanMove(i){
+    if(lock || board[i] || winnerOf(board)) return;
+    board[i] = HUMAN; draw();
+
+    // Prüfen auf Ende
+    const w = winnerOf(board);
+    if(w){ endGame(w); return; }
+    if(emptyIndices(board).length === 0){ endGame('draw'); return; }
+
+    // Computer denkt kurz
+    lock = true;
+    document.getElementById('ttt-status').textContent = 'Computer denkt …';
+    setTimeout(aiMove, 200);
+  }
+
+  function aiMove(){
+    // Minimax mit Tiefe, um früh zu gewinnen/spät zu verlieren
+    const best = minimax(board.slice(), AI, 0);
+    board[best.index] = AI; draw();
+    lock = false;
+
+    const w = winnerOf(board);
+    if(w){ endGame(w); return; }
+    if(emptyIndices(board).length === 0){ endGame('draw'); return; }
+    document.getElementById('ttt-status').textContent = 'Du bist X. Computer ist O.';
+  }
+
+  function minimax(b, player, depth){
+    const win = winnerOf(b);
+    if(win === AI)   return { score: 10 - depth };
+    if(win === HUMAN) return { score: depth - 10 };
+    const empties = emptyIndices(b);
+    if(empties.length === 0) return { score: 0 }; // Unentschieden
+
+    const moves = [];
+    for(const idx of empties){
+      const move = { index: idx };
+      b[idx] = player;
+
+      if(player === AI){
+        const result = minimax(b, HUMAN, depth+1);
+        move.score = result.score;
+      }else{
+        const result = minimax(b, AI, depth+1);
+        move.score = result.score;
+      }
+      b[idx] = '';
+      moves.push(move);
+    }
+
+    // Bestes Ergebnis auswählen
+    let bestMove;
+    if(player === AI){
+      let bestScore = -Infinity;
+      for(const m of moves){ if(m.score > bestScore){ bestScore = m.score; bestMove = m; } }
+    }else{
+      let bestScore = +Infinity;
+      for(const m of moves){ if(m.score < bestScore){ bestScore = m.score; bestMove = m; } }
+    }
+    return bestMove;
+  }
+
+  document.getElementById('ttt-reset').addEventListener('click', ()=>{
+    board = Array(9).fill('');
+    lock = false;
+    draw();
+    document.getElementById('ttt-status').textContent = 'Du bist X. Computer ist O.';
+  });
   draw();
 
-  // Ideen-Formular via Fetch zu FormSubmit (bleibt auf der Seite)
-  const form = document.getElementById('idea-form');
-  if(form){
-    form.addEventListener('submit', async (e)=>{
-      e.preventDefault();
-      const msg = document.getElementById('idea-msg');
-      msg.textContent = 'Sende ...'; msg.className='muted';
-      try{
-        const data = new FormData(form);
-        const res = await fetch(form.action, { method:'POST', body:data, headers: { 'Accept':'application/json' } });
-        if(res.ok){
-          msg.textContent = 'Danke! Deine Idee wurde gesendet 🙌'; msg.className='ok';
-          form.reset();
-        }else{
-          msg.textContent = 'Leider fehlgeschlagen. Versuche es später nochmal.'; msg.className='err';
-        }
-      }catch(err){
-        msg.textContent = 'Netzwerkfehler. Bitte später erneut versuchen.'; msg.className='err';
-      }
-    });
-  }
-
-  // Start
+  // Start (Fakten/Favoriten)
   renderFavs();
   loadFact();
 </script>
@@ -308,17 +360,14 @@ HTML = r"""
 </html>
 """
 
-import datetime  # oben in der Datei
-
 @app.route("/")
 def home():
-    now = datetime.datetime.now()                    # <- so ist's richtig
+    now = datetime.datetime.now()
     return render_template_string(
         HTML,
         time=now.strftime("%H:%M:%S"),
-        date=now.strftime("%d.%m.%Y")
+        date=now.strftime("%d.%m.%Y"),
     )
-
 
 @app.route("/api/fact")
 def fact_api():
@@ -333,7 +382,3 @@ def fact_api():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
-
-
-
-
