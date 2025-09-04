@@ -164,7 +164,7 @@ HTML = r"""
     </div>
   {% endif %}
 
-  <form action="{{ form_url }}" method="POST" class="idea-form">
+  <form action="https://formsubmit.co/info@aaron-sigma.de" method="POST" class="idea-form">
     <!-- FormSubmit Optionen -->
     <input type="hidden" name="_subject" value="Neue Idee von aaron-sigma.de">
     <input type="hidden" name="_template" value="box">
@@ -333,6 +333,7 @@ def fact_api():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
+
 
 
 
