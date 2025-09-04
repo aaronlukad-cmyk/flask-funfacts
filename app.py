@@ -1,6 +1,9 @@
 from flask import Flask, jsonify, render_template_string, request
 import random
 import datetime
+import os
+import smtplib
+from email.mime.text import MIMEText
 
 app = Flask(__name__)
 
@@ -93,6 +96,14 @@ HTML = """
     .t3-win{ box-shadow:0 0 0 2px var(--ok) inset }
     @media(max-width:520px){ .t3-cell{ width:92px;height:92px;font-size:38px } }
 
+    /* Idee-Form */
+    input[type="text"], textarea{
+      width:100%; background:#0f131a; border:1px solid var(--border); color:var(--text);
+      padding:10px 12px; border-radius:10px; outline:none;
+    }
+    textarea{ min-height:110px; resize:vertical }
+    .ok{ color:var(--ok) }
+    .err{ color:#f87171 }
     footer{ text-align:center; padding:18px; color:var(--muted) }
   </style>
 </head>
@@ -161,6 +172,27 @@ HTML = """
         <button id="t3-clear" class="btn" style="background:#444;">🧹 Score löschen</button>
       </div>
       <div id="t3-board"></div>
+    </section>
+
+    <!-- Idee einsenden -->
+    <section class="card">
+      <h2>💡 Deine Idee für die Website</h2>
+      <div class="row" style="margin-bottom:10px">
+        <div style="flex:1; min-width:220px">
+          <label for="idea-name" class="muted">Name</label><br>
+          <input id="idea-name" type="text" placeholder="Dein Name" required />
+        </div>
+      </div>
+      <div class="row" style="margin-bottom:10px">
+        <div style="flex:1; min-width:220px">
+          <label for="idea-text" class="muted">Deine Idee</label><br>
+          <textarea id="idea-text" placeholder="Was soll auf die Seite?"></textarea>
+        </div>
+      </div>
+      <div class="row">
+        <button id="idea-send" class="btn">📨 Idee absenden</button>
+        <span id="idea-msg" class="muted"></span>
+      </div>
     </section>
 
   </main>
@@ -350,6 +382,45 @@ HTML = """
 
       startGame();
     })();
+
+    // ---------- Idee senden ----------
+    const ideaBtn  = document.getElementById('idea-send');
+    const ideaName = document.getElementById('idea-name');
+    const ideaText = document.getElementById('idea-text');
+    const ideaMsg  = document.getElementById('idea-msg');
+
+    ideaBtn.addEventListener('click', async () => {
+      ideaMsg.textContent='';
+      const name = (ideaName.value || '').trim();
+      const text = (ideaText.value || '').trim();
+      if(!name || text.length < 5){
+        ideaMsg.textContent='Bitte Name angeben und eine sinnvoll lange Idee schreiben.';
+        ideaMsg.className='err';
+        return;
+      }
+      ideaBtn.disabled = true; ideaBtn.textContent='… wird gesendet';
+      try{
+        const res = await fetch('/submit_idea', {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({name, idea:text})
+        });
+        const data = await res.json();
+        if(data.ok){
+          ideaMsg.textContent='Danke! Deine Idee wurde verschickt.';
+          ideaMsg.className='ok';
+          ideaText.value='';
+        }else{
+          ideaMsg.textContent='Fehler: ' + (data.error || 'Versand fehlgeschlagen.');
+          ideaMsg.className='err';
+        }
+      }catch(e){
+        ideaMsg.textContent='Netzwerkfehler – bitte später nochmal.';
+        ideaMsg.className='err';
+      }finally{
+        ideaBtn.disabled=false; ideaBtn.textContent='📨 Idee absenden';
+      }
+    });
   </script>
 </body>
 </html>
@@ -370,6 +441,45 @@ def api_fact():
     else:
         fact = random.choice(FACTS[cat])
     return jsonify({"fact": fact})
+
+# --------- Idee per Mail senden ----------
+@app.post("/submit_idea")
+def submit_idea():
+    """
+    Erwartet JSON: { "name": "...", "idea": "..." }
+    Schickt die Idee per SMTP an MAIL_TO (default info@aaron-sigma.de).
+    """
+    data = request.get_json(silent=True) or {}
+    name = (data.get("name") or "").strip()
+    idea = (data.get("idea") or "").strip()
+
+    if not name or len(idea) < 5:
+        return jsonify({"ok": False, "error": "Ungültige Eingabe."}), 400
+
+    # SMTP Konfiguration (über Env-Variablen)
+    host = os.environ.get("SMTP_HOST", "smtp.hostinger.com")
+    port = int(os.environ.get("SMTP_PORT", "587"))
+    user = os.environ.get("SMTP_USER", "info@aaron-sigma.de")
+    pwd  = os.environ.get("SMTP_PASS", "")
+    to   = os.environ.get("MAIL_TO", "info@aaron-sigma.de")
+
+    if not pwd:
+        return jsonify({"ok": False, "error": "Mailer nicht konfiguriert."}), 500
+
+    body = f"Neue Idee von {name}:\n\n{idea}\n\n— automatisch gesendet von aaron-sigma.de"
+    msg = MIMEText(body, _charset="utf-8")
+    msg["Subject"] = "Neue Website-Idee"
+    msg["From"] = user
+    msg["To"] = to
+
+    try:
+        with smtplib.SMTP(host, port, timeout=20) as server:
+            server.starttls()
+            server.login(user, pwd)
+            server.send_message(msg)
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
 
 
 if __name__ == "__main__":
