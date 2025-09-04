@@ -153,31 +153,36 @@ HTML = r"""
       </div>
     </div>
 
-    <!-- Idee Formular (FormSubmit, kein Setup nötig) -->
-    <div class="card" style="margin-top:16px">
-      <h3 style="margin:0 0 10px">💡 Deine Idee für die Website</h3>
+   <!-- Ideen-Formular (funktioniert ohne Backend über FormSubmit) -->
+<section id="idee" class="card">
+  <h2>💡 Deine Idee für die Website</h2>
 
-      <form id="idea-form" action="{{ formsubmit_url }}" method="POST">
-        <label for="name">Name</label>
-        <input required type="text" name="name" id="name" placeholder="Dein Name" />
+  {% if sent %}
+    <div class="alert success">
+      ✅ Danke! Deine Idee wurde gesendet. Prüfe dein Postfach – beim allerersten Mal
+      musst du die kurze Bestätigung von FormSubmit bestätigen.
+    </div>
+  {% endif %}
 
-        <label for="idea">Deine Idee</label>
-        <textarea required name="idea" id="idea" placeholder="Deine Idee..."></textarea>
+  <form action="{{ form_url }}" method="POST" class="idea-form">
+    <!-- FormSubmit Optionen -->
+    <input type="hidden" name="_subject" value="Neue Idee von aaron-sigma.de">
+    <input type="hidden" name="_template" value="box">
+    <input type="hidden" name="_captcha" value="false">
+    <!-- Nach dem Absenden zurück auf die Seite mit Erfolgs-Hinweis -->
+    <input type="hidden" name="_next" value="https://aaron-sigma.de/?sent=1#idee">
+    <!-- Honeypot gegen Bots -->
+    <input type="text" name="_honey" style="display:none">
 
-        <!-- FormSubmit Optionen -->
-        <input type="hidden" name="_subject" value="Neue Website-Idee 🚀" />
-        <input type="hidden" name="_captcha" value="false">
-        <!-- nach Erfolg nicht weg-navigieren: JSON Antworten nutzen -->
+    <label for="name">Name</label>
+    <input id="name" name="name" type="text" placeholder="Dein Name" required>
 
-        <button class="btn" type="submit" style="background:var(--accent);color:#002011;border-color:transparent;margin-top:10px">
-          ✉️ Idee absenden
-        </button>
-        <div id="idea-msg" style="margin-top:10px"></div>
-      </form>
-      <p class="muted" style="margin-top:8px">
-        Hinweis: Beim <b>allerersten</b> Eingang schickt dir FormSubmit eine Bestätigungs-Mail.
-        Kurz bestätigen, danach kommen alle Ideen direkt an.
-      </p>
+    <label for="message">Deine Idee</label>
+    <textarea id="message" name="message" rows="5" placeholder="Schreib deine Idee hier rein..." required></textarea>
+
+    <button type="submit" class="btn primary">📧 Idee absenden</button>
+  </form>
+</section>
     </div>
 
     <footer>
@@ -305,7 +310,14 @@ HTML = r"""
 
 @app.route("/")
 def home():
-    return render_template_string(HTML, formsubmit_url=FORMSUBMIT_URL)
+    return render_template_string(
+        HTML,
+        time=now.strftime("%H:%M:%S"),
+        date=now.strftime("%d.%m.%Y"),
+        form_url=FORMSUBMIT_URL,
+        sent=request.args.get("sent")  # optional für Erfolgsmeldung
+    )
+
 
 @app.route("/api/fact")
 def fact_api():
@@ -320,3 +332,4 @@ def fact_api():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
+
