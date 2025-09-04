@@ -310,6 +310,7 @@ HTML = r"""
 
 @app.route("/")
 def home():
+    now = datetime.datetime.now
     return render_template_string(
         HTML,
         time=now.strftime("%H:%M:%S"),
@@ -332,4 +333,5 @@ def fact_api():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
+
 
