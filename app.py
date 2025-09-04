@@ -1,34 +1,50 @@
-# -*- coding: utf-8 -*-
 from flask import Flask, jsonify, render_template_string, request
 import random
 import datetime
 
 app = Flask(__name__)
 
+# -----------------------------
+#   Datenbasis: Fun-Facts
+# -----------------------------
 FACTS = {
     "lustig": [
-        "In der Schweiz ist es illegal, nur ein Meerschweinchen zu halten – sie brauchen Freunde! 🐹",
-        "Eine Gruppe Flamingos heißt tatsächlich 'Flamboyance'. 💅",
-        "In Japan gibt es KitKat mit Sojasoße-Geschmack. 🍫🍱",
         "Kühe haben beste Freunde und werden gestresst, wenn man sie trennt. 🐄❤️",
-        "Wombats kacken Würfel. Ernsthaft. 🧱",
+        "Ein Schneckenkuss kann bis zu drei Minuten dauern. 🐌💋",
+        "Bananen sind Beeren – Erdbeeren nicht. 🍌🍓",
+        "Wombat-Kot ist würfelförmig. ◼️",
+        "Ein Oktopus hat drei Herzen. 🐙"
     ],
     "tiere": [
-        "Oktopusse haben drei Herzen und blaues Blut. 🐙",
-        "Raben erkennen Gesichter und merken sich Feinde jahrelang. 🐦",
-        "Pinguine schenken ihren Partnern schöne Kieselsteine. 🐧💎",
+        "Raben können Gesichter erkennen und sich lange merken. 🐦",
+        "Axolotl können ganze Gliedmaßen nachwachsen lassen. 🦎",
+        "Seesterne haben kein Gehirn. ⭐",
+        "Fische können Musik unterscheiden. 🎵🐟",
+        "Koalas schlafen bis zu 22 Stunden am Tag. 😴"
     ],
-    "weltall": [
-        "Ein Tag auf der Venus ist länger als ein Jahr auf der Venus. 😵‍💫",
-        "Neutronensterne drehen sich bis zu 700 Mal pro Sekunde. 🌟",
+    "space": [
+        "Auf der Venus regnet es Metall. ☄️",
+        "Ein Tag auf der Venus ist länger als ein Jahr auf der Venus. 🪐",
+        "Es gibt mehr Sterne im Universum als Sandkörner auf allen Stränden der Erde. ✨",
+        "Neutronensterne können 600 Umdrehungen pro Sekunde machen. 🌀",
+        "Im All hört dich niemand schreien – Schall braucht ein Medium. 🌌"
     ],
-    "essen": [
-        "Ketchup wurde im 19. Jahrhundert als Medizin verkauft. 🍅",
-        "Ananas enthält Bromelain, ein Enzym, das dich 'zurück-verdaut'. 🍍",
-    ],
+    "wissen": [
+        "Das Internet wiegt ungefähr so viel wie eine Erdbeere. 🍓",
+        "Honig verdirbt praktisch nie – man fand essbaren Honig in Pyramiden. 🍯",
+        "Die erste E-Mail wurde 1971 verschickt. 📧",
+        "Menschen und Giraffen haben gleich viele Halswirbel: sieben. 🦒",
+        "Der heißeste Chili misst über 2 Millionen Scoville. 🌶️"
+    ]
 }
-ALL_FACTS = [f for cat in FACTS.values() for f in cat]
 
+ALL_CATS = list(FACTS.keys())
+ALL_FACTS = sum(FACTS.values(), [])
+
+
+# -----------------------------
+#             HTML
+# -----------------------------
 HTML = """
 <!doctype html>
 <html lang="de">
@@ -37,35 +53,47 @@ HTML = """
   <title>🎉 Fun-Facts · Smooth Clock</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    :root { --bg:#0d1117; --panel:#161b22; --text:#e6edf3; --muted:#9da7b3; --brand:#58a6ff; --accent:#238636; }
-    * { box-sizing:border-box; }
-    body { margin:0; font-family:system-ui, Segoe UI, Roboto, Arial, sans-serif; background:var(--bg); color:var(--text); }
-    header { padding:18px 20px; text-align:center; border-bottom:1px solid #202734; }
-    h1 { margin:0; color:var(--brand); font-size:26px; }
-    main { max-width:900px; margin:28px auto; padding:0 16px; display:grid; gap:18px; }
-    .card { background:var(--panel); border:1px solid #202734; border-radius:16px; padding:18px; box-shadow:0 6px 24px rgba(0,0,0,.25); }
-    .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
-    select, button { background:#0f1523; color:var(--text); border:1px solid #2a3242; border-radius:10px; padding:10px 12px; }
-    button { cursor:pointer; }
-    button.primary { background:var(--accent); border-color:#2ea043; }
-    button.ghost { background:transparent; border-color:#2a3242; }
-    #fact { font-size:22px; line-height:1.4; margin:8px 0 14px; }
-    .muted { color:var(--muted); font-size:13px; }
-
-    /* Uhr */
-    #clock { font-size:40px; font-weight:800; text-align:center; letter-spacing: .5px; }
-    #date  { font-size:18px; text-align:center; color:var(--muted); margin-top:6px; }
-    .tick  { animation: pop 180ms ease; }
-    @keyframes pop {
-      0%   { transform: scale(1);   text-shadow: 0 0 0 rgba(88,166,255,0);}
-      50%  { transform: scale(1.03);text-shadow: 0 0 12px rgba(88,166,255,0.35);}
-      100% { transform: scale(1);   text-shadow: 0 0 0 rgba(88,166,255,0);}
+    :root{
+      --bg:#0d1117; --panel:#161b22; --text:#e6edf3; --muted:#9da7b3;
+      --brand:#58a6ff; --ok:#22c55e; --btn:#23836c; --border:#202734;
     }
+    *{box-sizing:border-box}
+    body{ margin:0; font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif;
+          background:var(--bg); color:var(--text); }
+    header{ padding:22px 16px; border-bottom:1px solid var(--border)}
+    h1{ margin:0; font-size:clamp(1.3rem, 2.5vw, 1.8rem) }
+    main{ max-width:980px; margin:24px auto; padding:0 16px; display:grid; gap:18px }
+    .card{ background:var(--panel); border:1px solid var(--border); border-radius:16px; padding:18px }
+    h2{ margin:0 0 12px 0; color:var(--brand) }
+    .row{ display:flex; gap:12px; align-items:center; flex-wrap:wrap }
+    .btn{
+      padding:10px 14px; background:var(--btn); color:#fff; border:none; border-radius:12px;
+      font-weight:600; cursor:pointer;
+    }
+    .btn:hover{ filter:brightness(1.05) }
+    .pill{ display:inline-block; padding:6px 10px; border-radius:999px;
+           background:#0f131a; border:1px solid var(--border); font-size:.9rem }
+    .box{ background:#0f131a; border:1px solid var(--border); border-radius:12px; padding:12px }
+    .muted{ color:var(--muted) }
 
-    ul { list-style:none; margin:10px 0 0; padding:0; }
-    li { padding:10px 12px; border:1px solid #202734; border-radius:10px; margin-bottom:10px; background:#0f1523; display:flex; justify-content:space-between; gap:10px; }
-    .right { display:flex; gap:8px; }
-    footer { text-align:center; color:var(--muted); margin:28px 0; }
+    /* Uhr/Datum */
+    .clock{ font-size: clamp(2rem, 7vw, 3.4rem); font-weight:800; letter-spacing:.03em }
+    .date{ opacity:.85; margin-top:4px; font-size:1.1rem }
+
+    /* TicTacToe */
+    #t3-board{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; max-width:360px }
+    .t3-cell{
+      width:110px; height:110px; display:flex; align-items:center; justify-content:center;
+      background:#0f131a; border:1px solid var(--border); border-radius:14px;
+      font-weight:800; font-size:44px; user-select:none; cursor:pointer; transition:transform .05s;
+    }
+    .t3-cell:hover{ transform:scale(1.02) }
+    .t3-x{ color:#f87171 }  /* X rot   */
+    .t3-o{ color:#60a5fa }  /* O blau  */
+    .t3-win{ box-shadow:0 0 0 2px var(--ok) inset }
+    @media(max-width:520px){ .t3-cell{ width:92px;height:92px;font-size:38px } }
+
+    footer{ text-align:center; padding:18px; color:var(--muted) }
   </style>
 </head>
 <body>
@@ -74,123 +102,275 @@ HTML = """
   </header>
 
   <main>
-    <section class="card" id="time-card">
-      <div>🕒 Aktuelle Zeit & Datum</div>
-      <div id="clock">{{ time }}</div>
-      <div id="date">{{ date }}</div>
-    </section>
 
+    <!-- Uhr / Datum -->
     <section class="card">
-      <div class="row">
-        <label for="cat">Kategorie:</label>
-        <select id="cat">
-          <option value="lustig" selected>Lustig</option>
-          <option value="tiere">Tiere</option>
-          <option value="weltall">Weltall</option>
-          <option value="essen">Essen</option>
-          <option value="random">Zufällig</option>
-        </select>
-        <button id="btn-new" class="primary">🎲 Neuen Fakt</button>
-        <button id="btn-copy" class="ghost">📋 Kopieren</button>
-        <button id="btn-fav"  class="ghost">⭐ Favorit</button>
+      <h2>🕒 Aktuelle Zeit &amp; Datum</h2>
+      <div class="box">
+        <div id="clock" class="clock">--:--:--</div>
+        <div id="date"  class="date">--.--.----</div>
       </div>
-      <p id="fact">Lade Fakt…</p>
     </section>
 
-    <aside class="card">
-      <div class="row" style="justify-content:space-between;">
-        <strong>⭐ Favoriten</strong>
-        <button id="btn-clear" class="ghost">🗑️ Leeren</button>
+    <!-- Fun Facts -->
+    <section class="card">
+      <h2>✨ Fun-Facts</h2>
+
+      <div class="row" style="margin-bottom:10px">
+        <label class="pill">Kategorie:
+          <select id="cat"
+            style="margin-left:8px;background:#0f131a;border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:8px;">
+            <option value="lustig">Lustig</option>
+            <option value="tiere">Tiere</option>
+            <option value="space">Space</option>
+            <option value="wissen">Wissen</option>
+            <option value="random">Zufällig</option>
+          </select>
+        </label>
+
+        <button id="btn-new" class="btn">🎲 Neuen Fakt</button>
+        <button id="btn-copy" class="btn" style="background:#444;">📋 Kopieren</button>
+        <button id="btn-fav"  class="btn" style="background:#444;">⭐ Favorit</button>
       </div>
-      <ul id="favs"></ul>
-    </aside>
+
+      <div id="fact" class="box" style="font-size:1.2rem; line-height:1.6">Klicke „Neuen Fakt“ 🙌</div>
+
+      <div style="margin-top:14px">
+        <h3 style="margin:0 0 8px 0" class="muted">⭐ Favoriten</h3>
+        <div id="favs" class="box" style="min-height:52px"></div>
+        <div class="row" style="margin-top:8px">
+          <button id="btn-clear" class="btn" style="background:#444">🧹 Leeren</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tic-Tac-Toe -->
+    <section class="card" id="t3">
+      <h2>🎮 Tic-Tac-Toe</h2>
+      <div class="row" style="margin-bottom:10px">
+        <label class="pill">Schwierigkeit:
+          <select id="t3-level"
+              style="margin-left:8px;background:#0f131a;border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:8px;">
+            <option value="easy">Easy</option>
+            <option value="hard" selected>Hard (unbesiegbar)</option>
+          </select>
+        </label>
+        <span id="t3-status" class="pill">Du bist ❌ – du beginnst!</span>
+        <span id="t3-score"  class="pill">Siege: 0 | Niederl.: 0 | Remis: 0</span>
+        <button id="t3-reset" class="btn">🔁 Neues Spiel</button>
+        <button id="t3-clear" class="btn" style="background:#444;">🧹 Score löschen</button>
+      </div>
+      <div id="t3-board"></div>
+    </section>
+
   </main>
 
-  <footer>Made by aaron</footer>
+  <footer>Made by Aaron ✨</footer>
 
+  <!-- =========================
+            SCRIPTS
+       ========================= -->
   <script>
-    const clockEl = document.getElementById('clock');
-    const dateEl  = document.getElementById('date');
-    const factEl  = document.getElementById('fact');
-    const catEl   = document.getElementById('cat');
-    const favList = document.getElementById('favs');
-
-    // Helfer
-    const pad = n => String(n).padStart(2,'0');
-
-    // Smooth Clock mit requestAnimationFrame
-    let lastSecond = null;
+    // ---------- Uhr ----------
+    function pad(n){ return String(n).padStart(2, '0'); }
     function runClock(){
       const now = new Date();
-      const h = pad(now.getHours()), m = pad(now.getMinutes()), s = pad(now.getSeconds());
-      const text = h + ":" + m + ":" + s;
-
-      // Schreibe nur, wenn sich der Text geändert hat (spart Repaints)
-      if (clockEl.textContent !== text) {
-        // Tick-Animation nur beim Sekundenwechsel
-        if (lastSecond !== s) {
-          lastSecond = s;
-          clockEl.classList.remove('tick'); // re-trigger
-          // kleines Timeout, damit der Browser die Klasse neu anwendet
-          requestAnimationFrame(() => clockEl.classList.add('tick'));
-        }
-        clockEl.textContent = text;
-      }
-      // Datum fortlaufend mitführen
-      dateEl.textContent = now.toLocaleDateString('de-DE');
-      requestAnimationFrame(runClock);
+      document.getElementById('clock').textContent =
+        pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds());
+      document.getElementById('date').textContent =
+        pad(now.getDate()) + '.' + pad(now.getMonth()+1) + '.' + now.getFullYear();
     }
+    runClock(); setInterval(runClock, 1000);
 
-    async function loadFact(){
-      const cat = catEl.value;
-      const res = await fetch('/api/fact?cat=' + encodeURIComponent(cat));
-      const data = await res.json();
-      factEl.textContent = data.fact;
-      factEl.dataset.fact = data.fact;
-    }
-
+    // ---------- Fun Facts ----------
+    const favKey = 'fun_facts_favs_v1';
     function renderFavs(){
-      const favs = JSON.parse(localStorage.getItem('favs') || '[]');
-      favList.innerHTML = '';
-      favs.forEach((f, i) => {
-        const li = document.createElement('li');
-        li.textContent = f;
-        favList.append(li);
-      });
+      const box = document.getElementById('favs');
+      const list = JSON.parse(localStorage.getItem(favKey) || '[]');
+      if(!list.length){ box.innerHTML = '<span class="muted">Noch keine Favoriten.</span>'; return; }
+      box.innerHTML = list.map(f => '<div style="margin:4px 0">'+ f +'</div>').join('');
     }
-
-    document.getElementById('btn-new').onclick = loadFact;
-    document.getElementById('btn-copy').onclick = () => navigator.clipboard.writeText(factEl.dataset.fact || factEl.textContent);
-    document.getElementById('btn-fav').onclick  = () => {
-      const t = factEl.dataset.fact || factEl.textContent; if(!t) return;
-      const favs = JSON.parse(localStorage.getItem('favs') || '[]');
-      if(!favs.includes(t)) favs.unshift(t);
-      localStorage.setItem('favs', JSON.stringify(favs.slice(0,50)));
+    async function loadFact(){
+      const sel = document.getElementById('cat').value || 'random';
+      const res = await fetch('/api/fact?cat=' + encodeURIComponent(sel));
+      const data = await res.json();
+      const el = document.getElementById('fact');
+      el.textContent = data.fact;
+      el.dataset.fact = data.fact;
+    }
+    document.getElementById('btn-new').onclick  = loadFact;
+    document.getElementById('btn-copy').onclick = () => {
+      const t = document.getElementById('fact').dataset.fact || document.getElementById('fact').textContent;
+      navigator.clipboard.writeText(t);
+    };
+    document.getElementById('btn-fav').onclick = () => {
+      const t = document.getElementById('fact').dataset.fact || document.getElementById('fact').textContent;
+      if(!t) return;
+      const list = JSON.parse(localStorage.getItem(favKey) || '[]');
+      if(!list.includes(t)) list.unshift(t);
+      localStorage.setItem(favKey, JSON.stringify(list.slice(0, 50)));
       renderFavs();
     };
-    document.getElementById('btn-clear').onclick = () => { localStorage.removeItem('favs'); renderFavs(); };
+    document.getElementById('btn-clear').onclick = () => {
+      localStorage.removeItem(favKey); renderFavs();
+    };
+    renderFavs(); loadFact();
 
-    // Initial
-    renderFavs(); loadFact(); runClock();
+    // ---------- TicTacToe ----------
+    (() => {
+      const boardEl = document.getElementById('t3-board');
+      const statusEl= document.getElementById('t3-status');
+      const scoreEl = document.getElementById('t3-score');
+      const resetBt = document.getElementById('t3-reset');
+      const clearBt = document.getElementById('t3-clear');
+      const levelSel= document.getElementById('t3-level');
+
+      const W_KEY='t3_wins', L_KEY='t3_losses', D_KEY='t3_draws';
+      let wins=+localStorage.getItem(W_KEY)||0,
+          losses=+localStorage.getItem(L_KEY)||0,
+          draws=+localStorage.getItem(D_KEY)||0;
+      function updateScore(){ scoreEl.textContent = `Siege: ${wins} | Niederl.: ${losses} | Remis: ${draws}`; }
+      updateScore();
+
+      const combos = [
+        [0,1,2],[3,4,5],[6,7,8],
+        [0,3,6],[1,4,7],[2,5,8],
+        [0,4,8],[2,4,6]
+      ];
+
+      let board, human='X', bot='O', running=true;
+
+      function buildBoard(){
+        boardEl.innerHTML='';
+        for (let i=0;i<9;i++){
+          const c=document.createElement('div');
+          c.className='t3-cell';
+          c.dataset.i=i;
+          c.addEventListener('click', onHuman);
+          boardEl.appendChild(c);
+        }
+      }
+
+      function startGame(){
+        board=Array(9).fill(null);
+        running=true;
+        buildBoard();
+        statusEl.textContent='Du bist ❌ – du beginnst!';
+      }
+
+      function winner(b){
+        for(const [a,b2,c] of combos){
+          if(b[a] && b[a]===b[b2] && b[a]===b[c]) return {player:b[a], line:[a,b2,c]};
+        }
+        if(b.every(Boolean)) return {player:'draw'};
+        return null;
+      }
+
+      function onHuman(e){
+        if(!running) return;
+        const i=+e.currentTarget.dataset.i;
+        if(board[i]) return;
+        place(i,human);
+        const w=winner(board);
+        if(endIfNeeded(w)) return;
+        setTimeout(botMove, 320);
+      }
+
+      function place(i, p){
+        board[i]=p;
+        const cell=boardEl.children[i];
+        cell.textContent=p==='X'?'✕':'◯';
+        cell.classList.add(p==='X'?'t3-x':'t3-o');
+      }
+      function emptyIdx(b){ return b.map((v,i)=>v?null:i).filter(i=>i!==null); }
+
+      function botMove(){
+        let move;
+        if(levelSel.value==='easy'){
+          const free=emptyIdx(board);
+          move=free[Math.floor(Math.random()*free.length)];
+        }else{
+          move = bestMove(board, bot).index;
+        }
+        place(move, bot);
+        const w=winner(board);
+        endIfNeeded(w);
+      }
+
+      // Minimax
+      function bestMove(b, player){
+        const w = winner(b);
+        if(w){
+          if(w.player===bot) return {score: 1};
+          if(w.player===human) return {score:-1};
+          return {score:0};
+        }
+        const moves=[];
+        for(const i of emptyIdx(b)){
+          const newB=b.slice(); newB[i]=player;
+          const next = bestMove(newB, player===bot?human:bot);
+          moves.push({index:i, score: next.score * (player===bot?1:-1)});
+        }
+        return player===bot
+          ? moves.reduce((a,m)=> m.score>a.score?m:a)
+          : moves.reduce((a,m)=> m.score<a.score?m:a);
+      }
+
+      function highlight(line){
+        line.forEach(i=>boardEl.children[i].classList.add('t3-win'));
+      }
+
+      function endIfNeeded(w){
+        if(!w) return false;
+        running=false;
+        if(w.player==='draw'){
+          statusEl.textContent='Unentschieden.';
+          draws++; localStorage.setItem(D_KEY,draws);
+        }else if(w.player===human){
+          statusEl.textContent='Du gewinnst! 🎉';
+          highlight(w.line);
+          wins++; localStorage.setItem(W_KEY,wins);
+        }else{
+          statusEl.textContent='Bot gewinnt 😅';
+          highlight(w.line);
+          losses++; localStorage.setItem(L_KEY,losses);
+        }
+        updateScore();
+        return true;
+      }
+
+      resetBt.addEventListener('click', startGame);
+      clearBt.addEventListener('click', ()=>{
+        wins=losses=draws=0;
+        localStorage.removeItem(W_KEY);
+        localStorage.removeItem(L_KEY);
+        localStorage.removeItem(D_KEY);
+        updateScore();
+      });
+
+      startGame();
+    })();
   </script>
 </body>
 </html>
 """
 
+# -----------------------------
+#            ROUTES
+# -----------------------------
 @app.route("/")
 def home():
-    now = datetime.datetime.now()
-    return render_template_string(HTML, time=now.strftime("%H:%M:%S"), date=now.strftime("%d.%m.%Y"))
+    return render_template_string(HTML)
 
 @app.get("/api/fact")
 def api_fact():
     cat = (request.args.get("cat") or "random").lower()
-    fact = random.choice(ALL_FACTS) if cat == "random" or cat not in FACTS else random.choice(FACTS[cat])
+    if cat == "random" or cat not in FACTS:
+        fact = random.choice(ALL_FACTS)
+    else:
+        fact = random.choice(FACTS[cat])
     return jsonify({"fact": fact})
 
+
 if __name__ == "__main__":
-    import os
-    port = int(os.environ.get("PORT", 5000))  # Render gibt PORT vor
-    app.run(host="0.0.0.0", port=port, debug=False)
-
-
+    app.run(debug=True)
