@@ -308,15 +308,15 @@ HTML = r"""
 </html>
 """
 
+import datetime  # oben in der Datei
+
 @app.route("/")
 def home():
-    now = datetime.datetime.now
+    now = datetime.datetime.now()                    # <- so ist's richtig
     return render_template_string(
         HTML,
         time=now.strftime("%H:%M:%S"),
-        date=now.strftime("%d.%m.%Y"),
-        form_url=FORMSUBMIT_URL,
-        sent=request.args.get("sent")  # optional für Erfolgsmeldung
+        date=now.strftime("%d.%m.%Y")
     )
 
 
@@ -333,5 +333,6 @@ def fact_api():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
+
 
 
