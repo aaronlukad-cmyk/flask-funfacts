@@ -1,346 +1,322 @@
-import os
+from flask import Flask, jsonify, render_template_string, request
 import random
 import datetime
-from flask import Flask, jsonify, render_template_string, request
-from flask_mail import Mail, Message
 
 app = Flask(__name__)
 
-# -----------------------------
-#  Mail-Config aus Umgebungsvariablen
-# -----------------------------
-app.config["MAIL_SERVER"] = os.environ.get("MAIL_SERVER", "")
-app.config["MAIL_PORT"] = int(os.environ.get("MAIL_PORT", "465"))
-app.config["MAIL_USE_TLS"] = os.environ.get("MAIL_USE_TLS", "False") == "True"
-app.config["MAIL_USE_SSL"] = os.environ.get("MAIL_USE_SSL", "True") == "True"
-app.config["MAIL_USERNAME"] = os.environ.get("MAIL_USERNAME", "")
-app.config["MAIL_PASSWORD"] = os.environ.get("MAIL_PASSWORD", "")
-app.config["MAIL_DEFAULT_SENDER"] = os.environ.get("MAIL_DEFAULT_SENDER", "")
-MAIL_TO = os.environ.get("MAIL_TO", app.config["MAIL_DEFAULT_SENDER"])
+# ─────────────────────────────────────────────────────────────────────────────
+# IDEEN-FORMULAR: sendet ohne Setup an deine Mailadresse über FormSubmit
+FORMSUBMIT_URL = "https://formsubmit.co/info@aaron-sigma.de"
+# ─────────────────────────────────────────────────────────────────────────────
 
-mail = Mail(app)
+# Kleine Fakten-Datenbank
+FACTS = {
+    "lustig": [
+        "Kühe haben beste Freunde und werden gestresst, wenn man sie trennt. 🐮❤️",
+        "Ein Straußenei braucht rund 40 Minuten, um weich zu kochen. 🥚",
+        "Honig verdirbt nie — Archäologen fanden essbaren Honig in 3000 Jahre alten Gräbern. 🍯",
+        "Koalas schlafen bis zu 22 Stunden am Tag. 😴🐨",
+    ],
+    "tiere": [
+        "Oktopusse haben drei Herzen. 🐙",
+        "Ein Tintenfisch kann durch ein Loch passen, das so groß ist wie sein Schnabel. 🦑",
+        "Schmetterlinge schmecken mit ihren Füßen. 🦋",
+        "Raben können menschliche Gesichter erkennen und sich merken. 🐦",
+    ],
+    "wissen": [
+        "Die erste Website ging 1991 online. 🌐",
+        "Der Eiffelturm wird im Sommer bis zu 15 cm höher. 🗼",
+        "Banane ist eine Beere, die Erdbeere nicht. 🍓🍌",
+        "Wasser dehnt sich beim Gefrieren aus. ❄️",
+    ],
+}
+ALL_FACTS = sum(FACTS.values(), [])
 
-# -------------------------------------------------
-#   HTML-Template (Seite, Stil, JS)
-# -------------------------------------------------
 HTML = r"""
 <!doctype html>
 <html lang="de">
 <head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>🎉 Fun-Facts • Smooth Clock • Mini-Games</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Fun-Facts • Smooth Clock • Mini-Game</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+
 <style>
-  :root {
-    --bg: #0f172a;
-    --card: #111827;
-    --text: #e5e7eb;
-    --muted: #9ca3af;
-    --primary: #60a5fa;
-    --success: #22c55e;
-    --danger: #ef4444;
-    --accent: #34d399;
+  :root{
+    --bg:#0b0f14; --card:#121824; --muted:#9fb0c3; --text:#e8f1fb;
+    --primary:#4aa3ff; --accent:#22c55e; --danger:#ef4444; --yellow:#facc15;
   }
-  html, body {
-    margin: 0; padding: 0;
-    background: var(--bg); color: var(--text);
-    font-family: system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial, sans-serif;
+  *{box-sizing:border-box}
+  body{
+    margin:0; font-family:Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif;
+    background:linear-gradient(180deg,#0b0f14 0%, #0d141f 100%); color:var(--text);
   }
-  .wrap { max-width: 1100px; margin: 24px auto; padding: 0 16px;}
-  .title { font-size: clamp(28px, 4vw, 42px); line-height: 1.2; margin: 0 0 12px}
-  .subtitle { color: var(--muted); margin: 0 0 32px; }
-  .grid { display: grid; gap: 18px; grid-template-columns: repeat(12,1fr);}
-  .col-12 { grid-column: span 12; } .col-6 { grid-column: span 6; }
-  .card { background: var(--card); border-radius: 16px; padding: 18px; box-shadow: 0 12px 40px rgba(0,0,0,.25);}
-  .hl { color: #93c5fd; }
-  .btn { background: var(--accent); color: #052e22; border:0; border-radius: 12px; padding: 12px 16px; font-weight: 700; cursor:pointer; transition: .2s transform, .2s opacity;}
-  .btn:hover { transform: translateY(-1px); opacity: .95;}
-  .btn-ghost { background: #1f2937; color: var(--text);}
-  .row { display:flex; gap:10px; flex-wrap: wrap; align-items: center}
-  input, textarea, select {
-    width:100%; box-sizing:border-box; background:#0b1220; border:1px solid #25324a;
-    color:var(--text); border-radius:12px; padding:12px 14px; font-size:16px; outline: none;
+  .wrap{max-width:980px;margin:40px auto;padding:0 16px}
+  h1{font-size: clamp(28px, 4vw, 42px); line-height:1.15; margin:0 0 18px}
+  .muted{color:var(--muted)}
+  .card{
+    background:var(--card);
+    border:1px solid rgba(255,255,255,.06);
+    border-radius:18px; padding:18px 16px; box-shadow:0 10px 24px rgba(0,0,0,.35);
   }
-  .label { font-weight:700; margin: 8px 0 6px; display:block;}
-  .muted { color: var(--muted); font-size: 14px;}
-  .footer { text-align:center; color:var(--muted); margin: 26px 0 40px}
-  .badge { padding: 6px 10px; border-radius: 999px; background:#1f2937; color:#cbd5e1; font-size:12px; font-weight:700;}
+
   /* Clock */
-  .clock { font-size: clamp(36px, 6vw, 72px); letter-spacing: 1px; text-align:center; font-weight:900;}
-  .date { text-align:center; color: var(--muted); margin-top: 6px; font-weight:600;}
-  /* Fact box */
-  .fact { font-size: 20px; line-height:1.6; }
-  .pill { background:#0b1220; padding:8px 12px; border-radius:999px; border:1px solid #243149; }
-  /* Tic tac toe */
-  .ttt-grid { display:grid; grid-template-columns: repeat(3, 100px); gap:10px; justify-content:center; padding:12px 0}
-  .ttt-cell { width:100px; height:100px; background:#0b1220; border:1px solid #243149; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:42px; font-weight:900; cursor:pointer; user-select:none;}
-  .ttt-info { text-align:center; margin-top:8px; font-weight:700 }
-  .ok { color: var(--success);} .err { color: var(--danger);}
-  @media (max-width: 900px) { .col-6 { grid-column: span 12; } }
+  .clock{ display:flex;flex-direction:column;align-items:center;gap:12px;padding:18px;text-align:center; }
+  .time{ font-variant-numeric:tabular-nums; font-size: clamp(40px, 7vw, 72px); font-weight:800 }
+  .date{ font-size:18px; color:var(--muted) }
+
+  /* Facts */
+  .facts .row{display:flex; gap:10px; flex-wrap:wrap; align-items:center}
+  .select, .btn{
+    appearance:none;border:1px solid rgba(255,255,255,.08); background:#0e1420; color:var(--text);
+    padding:10px 14px;border-radius:12px; font-weight:600
+  }
+  .btn{ cursor:pointer; transition:.15s transform ease }
+  .btn:hover{ transform: translateY(-1px); }
+  .btn.primary{ background:var(--primary); border-color:transparent; color:#001022 }
+  .btn.copy{ background:#142134 }
+  .btn.fav{ background:#142b20 }
+  .fact{ margin:14px 0 0; font-size: clamp(20px, 2.8vw, 28px); line-height:1.35; }
+
+  /* Favorites */
+  .favlist{display:flex; flex-direction:column; gap:8px}
+  .favitem{ background:#0e1420; padding:10px 12px; border-radius:10px; border:1px solid rgba(255,255,255,.06) }
+
+  /* TicTacToe */
+  .ttt{ display:grid; grid-template-columns:repeat(3, 96px); gap:10px; justify-content:center }
+  .ttt button{
+    width:96px; height:96px; font-weight:800; font-size:42px; color:var(--text);
+    background:#0e1420; border:1px solid rgba(255,255,255,.08); border-radius:12px; cursor:pointer;
+  }
+  .ttt .win{ background: #0f2a18; border-color:#1d6c3a; }
+  .center{text-align:center}
+
+  /* Idea form */
+  label{ display:block; margin:10px 0 6px; font-weight:700 }
+  input[type=text], textarea{
+    width:100%; background:#0e1420; border:1px solid rgba(255,255,255,.08);
+    color:var(--text); border-radius:12px; padding:12px 14px; outline:none;
+  }
+  textarea{ min-height:140px; resize:vertical }
+  .ok{color:var(--accent); font-weight:700}
+  .err{color:var(--danger); font-weight:700}
+
+  footer{margin:28px 0 60px;text-align:center;color:var(--muted)}
+  footer .brand{color:var(--text); font-weight:800}
 </style>
 </head>
 <body>
-<div class="wrap">
-  <h1 class="title">🎉 Fun-Facts • Smooth <span class="hl">Clock</span></h1>
-  <p class="subtitle">Uhrzeit + Datum, zufällige Fakten, Tic-Tac-Toe & Ideenformular</p>
+  <div class="wrap">
+    <h1>🎉 Fun-Facts • Smooth Clock</h1>
 
-  <div class="grid">
     <!-- Clock -->
-    <div class="col-6 card">
-      <div class="row" style="justify-content:space-between">
-        <span class="badge">⏰ Aktuelle Zeit</span>
-        <span id="tz" class="muted"></span>
-      </div>
-      <div id="clock" class="clock">--:--:--</div>
-      <div id="date" class="date">--.--.----</div>
+    <div class="card clock">
+      <div class="time" id="time">--:--:--</div>
+      <div class="date" id="date">--.--.----</div>
     </div>
 
     <!-- Facts -->
-    <div class="col-6 card">
-      <div class="row" style="justify-content:space-between; margin-bottom:12px">
-        <span class="badge">💡 Fun-Facts</span>
-        <div class="row">
-          <select id="cat" class="pill">
-            <option value="random">Zufällig</option>
-            <option value="lustig">Lustig</option>
-            <option value="tiere">Tiere</option>
-            <option value="wissenschaft">Wissenschaft</option>
-            <option value="misc">Misc</option>
-          </select>
-          <button id="btn-new" class="btn">🎲 Neuen Fakt</button>
-        </div>
+    <div class="card facts" style="margin-top:16px">
+      <div class="row">
+        <span class="muted">Kategorie:</span>
+        <select id="cat" class="select">
+          <option value="lustig">Lustig</option>
+          <option value="tiere">Tiere</option>
+          <option value="wissen">Wissen</option>
+          <option value="random">Zufällig</option>
+        </select>
+        <button class="btn primary" id="btn-new">🎲 Neuen Fakt</button>
+        <button class="btn copy" id="btn-copy">📋 Kopieren</button>
+        <button class="btn fav" id="btn-fav">⭐ Favorit</button>
       </div>
-      <div id="fact" class="fact">Klick auf „Neuen Fakt“ 🎲</div>
+      <div class="fact" id="fact">Klicke auf „Neuen Fakt“ 🙂</div>
     </div>
 
-    <!-- Tic tac toe -->
-    <div class="col-6 card">
-      <div class="row" style="justify-content:space-between">
-        <span class="badge">🎮 Mini-Game</span>
-        <button id="ttt-reset" class="btn btn-ghost">↺ Reset</button>
+    <!-- Favorites -->
+    <div class="card" style="margin-top:16px">
+      <div class="row" style="justify-content:space-between; align-items:center">
+        <h3 style="margin:0">⭐ Favoriten</h3>
+        <button class="btn" id="btn-clear">🗑️ Leeren</button>
       </div>
-      <div class="ttt-grid" id="ttt">
-        <div class="ttt-cell" data-i="0"></div>
-        <div class="ttt-cell" data-i="1"></div>
-        <div class="ttt-cell" data-i="2"></div>
-        <div class="ttt-cell" data-i="3"></div>
-        <div class="ttt-cell" data-i="4"></div>
-        <div class="ttt-cell" data-i="5"></div>
-        <div class="ttt-cell" data-i="6"></div>
-        <div class="ttt-cell" data-i="7"></div>
-        <div class="ttt-cell" data-i="8"></div>
-      </div>
-      <div class="ttt-info" id="ttt-info">Du bist <b>X</b>. Viel Spaß!</div>
+      <div class="favlist" id="favlist" style="margin-top:10px"></div>
     </div>
 
-    <!-- Idea form -->
-    <div class="col-6 card">
-      <span class="badge">💡 Deine Idee für die Website</span>
-      <label class="label" for="idea-name">Name</label>
-      <input id="idea-name" placeholder="Dein Name"/>
-      <label class="label" for="idea-text">Deine Idee</label>
-      <textarea id="idea-text" rows="6" placeholder="Was sollen wir bauen?"></textarea>
-      <div class="row" style="margin-top:10px">
-        <button id="idea-send" class="btn">📧 Idee absenden</button>
-        <span id="idea-msg" class="muted"></span>
+    <!-- TicTacToe -->
+    <div class="card" style="margin-top:16px">
+      <h3 style="margin-top:0">🎮 Mini-Game: Tic-Tac-Toe</h3>
+      <div class="center muted" id="ttt-status">Du bist X. Viel Spaß!</div>
+      <div class="ttt" id="ttt"></div>
+      <div class="center" style="margin-top:10px">
+        <button class="btn" id="ttt-reset">Neu starten</button>
       </div>
-      <div id="mailer-warning" class="muted" style="margin-top:8px;"></div>
     </div>
+
+    <!-- Idee Formular (FormSubmit, kein Setup nötig) -->
+    <div class="card" style="margin-top:16px">
+      <h3 style="margin:0 0 10px">💡 Deine Idee für die Website</h3>
+
+      <form id="idea-form" action="{{ formsubmit_url }}" method="POST">
+        <label for="name">Name</label>
+        <input required type="text" name="name" id="name" placeholder="Dein Name" />
+
+        <label for="idea">Deine Idee</label>
+        <textarea required name="idea" id="idea" placeholder="Deine Idee..."></textarea>
+
+        <!-- FormSubmit Optionen -->
+        <input type="hidden" name="_subject" value="Neue Website-Idee 🚀" />
+        <input type="hidden" name="_captcha" value="false">
+        <!-- nach Erfolg nicht weg-navigieren: JSON Antworten nutzen -->
+
+        <button class="btn" type="submit" style="background:var(--accent);color:#002011;border-color:transparent;margin-top:10px">
+          ✉️ Idee absenden
+        </button>
+        <div id="idea-msg" style="margin-top:10px"></div>
+      </form>
+      <p class="muted" style="margin-top:8px">
+        Hinweis: Beim <b>allerersten</b> Eingang schickt dir FormSubmit eine Bestätigungs-Mail.
+        Kurz bestätigen, danach kommen alle Ideen direkt an.
+      </p>
+    </div>
+
+    <footer>
+      <div class="muted">Made by <span class="brand">Aaron ✨</span></div>
+    </footer>
   </div>
 
-  <p class="footer">Made by Aaron ✨</p>
-</div>
-
 <script>
-/* ---------- Clock ---------- */
-function pad(n){return ("0"+n).slice(-2)}
-function tick(){
-  const d = new Date();
-  document.getElementById("clock").textContent =
-    pad(d.getHours()) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds());
-  document.getElementById("date").textContent =
-    pad(d.getDate()) + "." + pad(d.getMonth()+1) + "." + d.getFullYear();
-}
-setInterval(tick,1000); tick();
-document.getElementById("tz").textContent = Intl.DateTimeFormat().resolvedOptions().timeZone;
-
-/* ---------- Facts ---------- */
-async function loadFact(){
-  const cat = document.getElementById("cat").value;
-  const r = await fetch("/api/fact?cat="+encodeURIComponent(cat));
-  const j = await r.json();
-  document.getElementById("fact").textContent = j.fact || "—";
-}
-document.getElementById("btn-new").addEventListener("click", loadFact);
-
-/* ---------- TicTacToe ---------- */
-const cells = [...document.querySelectorAll(".ttt-cell")];
-const info  = document.getElementById("ttt-info");
-let board = Array(9).fill(null);
-let player = "X";
-const wins = [
-  [0,1,2],[3,4,5],[6,7,8],
-  [0,3,6],[1,4,7],[2,5,8],
-  [0,4,8],[2,4,6]
-];
-function winner(b){
-  for(const [a,b2,c] of wins){
-    if(b[a] && b[a]===b[b2] && b[a]===b[c]) return b[a];
+  // Uhr
+  function runClock(){
+    const now = new Date();
+    const two = n => String(n).padStart(2, '0');
+    const hh = two(now.getHours()), mm = two(now.getMinutes()), ss = two(now.getSeconds());
+    const d = two(now.getDate()), m = two(now.getMonth()+1), y = now.getFullYear();
+    document.getElementById("time").textContent = `${hh}:${mm}:${ss}`;
+    document.getElementById("date").textContent = `${d}.${m}.${y}`;
   }
-  if(b.every(Boolean)) return "draw";
-  return null;
-}
-function aiMove(){
-  // sehr einfach: nimm erste freie Zelle
-  const i = board.findIndex(v => !v);
-  if(i>=0){ board[i] = "O"; cells[i].textContent = "O"; }
-}
-function handleClick(e){
-  const i = +e.target.dataset.i;
-  if(board[i] || winner(board)) return;
-  board[i] = "X"; e.target.textContent = "X";
-  let w = winner(board);
-  if(w){
-    info.innerHTML = (w==="draw") ? "Unentschieden!" : "Gewonnen: <b>"+w+"</b>";
-    return;
-  }
-  aiMove();
-  w = winner(board);
-  if(w){
-    info.innerHTML = (w==="draw") ? "Unentschieden!" : "Gewonnen: <b>"+w+"</b>";
-  }
-}
-cells.forEach(c => c.addEventListener("click", handleClick));
-document.getElementById("ttt-reset").addEventListener("click", () => {
-  board = Array(9).fill(null);
-  cells.forEach(c => c.textContent = "");
-  info.innerHTML = "Du bist <b>X</b>. Viel Spaß!";
-});
+  setInterval(runClock, 1000); runClock();
 
-/* ---------- Idea form ---------- */
-async function sendIdea(){
-  const name = document.getElementById("idea-name").value.trim();
-  const idea = document.getElementById("idea-text").value.trim();
-  const msg  = document.getElementById("idea-msg");
-  msg.textContent = "Sende...";
-  try{
-    const r = await fetch("/send_idea", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({name, idea})
+  // Facts
+  async function loadFact(){
+    const cat = document.getElementById('cat').value;
+    const url = cat === 'random' ? '/api/fact' : `/api/fact?cat=${encodeURIComponent(cat)}`;
+    const res = await fetch(url); const data = await res.json();
+    document.getElementById('fact').textContent = data.fact;
+  }
+  document.getElementById('btn-new').addEventListener('click', loadFact);
+  document.getElementById('cat').addEventListener('change', loadFact);
+
+  // Copy
+  document.getElementById('btn-copy').addEventListener('click', async ()=>{
+    const t = document.getElementById('fact').textContent;
+    try{ await navigator.clipboard.writeText(t); flash("Kopiert!"); }catch(e){ flash("Kopieren fehlgeschlagen","err"); }
+  });
+
+  // Favoriten
+  function getFavs(){ try{ return JSON.parse(localStorage.getItem('favs')||'[]'); }catch(e){ return []; } }
+  function setFavs(a){ localStorage.setItem('favs', JSON.stringify(a.slice(0,50))); }
+  function renderFavs(){
+    const box = document.getElementById('favlist'); box.innerHTML='';
+    getFavs().forEach((f,i)=>{
+      const div = document.createElement('div'); div.className='favitem'; div.textContent = f;
+      div.addEventListener('click', ()=>{ document.getElementById('fact').textContent = f; });
+      box.appendChild(div);
     });
-    const j = await r.json();
-    if(j.ok){
-      msg.textContent = "Danke! Idee wurde gesendet.";
-      msg.className = "ok";
-      document.getElementById("idea-name").value = "";
-      document.getElementById("idea-text").value = "";
-    } else {
-      msg.textContent = "Fehler: " + (j.error || "Mailer nicht konfiguriert.");
-      msg.className = "err";
-    }
-  }catch(e){
-    msg.textContent = "Fehler beim Senden.";
-    msg.className = "err";
   }
-}
-document.getElementById("idea-send").addEventListener("click", sendIdea);
+  document.getElementById('btn-fav').addEventListener('click', ()=>{
+    const t = document.getElementById('fact').textContent.trim(); if(!t) return;
+    const favs = getFavs(); if(!favs.includes(t)){ favs.unshift(t); setFavs(favs); renderFavs(); flash("Favorit gespeichert","ok"); }
+  });
+  document.getElementById('btn-clear').addEventListener('click', ()=>{ localStorage.removeItem('favs'); renderFavs(); });
+
+  // Mini Flash
+  function flash(msg, cls='ok'){
+    const n = document.createElement('div');
+    n.textContent = msg; n.className=cls;
+    n.style.position='fixed'; n.style.bottom='16px'; n.style.left='50%'; n.style.transform='translateX(-50%)';
+    n.style.background = 'rgba(20,42,50,.9)'; n.style.border='1px solid rgba(255,255,255,.1)';
+    n.style.padding='10px 14px'; n.style.borderRadius='10px'; n.style.zIndex='9999';
+    document.body.appendChild(n); setTimeout(()=>n.remove(), 1600);
+  }
+
+  // TicTacToe
+  const ttt = document.getElementById('ttt');
+  let board = Array(9).fill(''); let current = 'X'; let lock=false;
+  const wins = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+  function draw(){
+    ttt.innerHTML='';
+    board.forEach((val,i)=>{
+      const b = document.createElement('button'); b.textContent = val;
+      b.addEventListener('click', ()=>move(i));
+      ttt.appendChild(b);
+    });
+  }
+  function move(i){
+    if(lock || board[i]) return;
+    board[i] = current; draw();
+    const w = winner(); if(w){ endGame(w); return; }
+    if(board.every(v=>v)) { endGame('draw'); return; }
+    current = current==='X' ? 'O':'X';
+    document.getElementById('ttt-status').textContent = `Du bist ${current}. Viel Spaß!`;
+  }
+  function winner(){
+    for(const [a,b,c] of wins){ if(board[a] && board[a]===board[b] && board[b]===board[c]) return [a,b,c]; }
+    return null;
+  }
+  function endGame(res){
+    lock = true;
+    if(res==='draw'){ document.getElementById('ttt-status').textContent = 'Unentschieden!'; return; }
+    document.getElementById('ttt-status').textContent = `${board[res[0]]} gewinnt!`;
+    [...ttt.children].forEach((btn,i)=>{ if(res.includes(i)) btn.classList.add('win'); });
+  }
+  document.getElementById('ttt-reset').addEventListener('click', ()=>{ board = Array(9).fill(''); current='X'; lock=false; draw(); document.getElementById('ttt-status').textContent='Du bist X. Viel Spaß!'; });
+  draw();
+
+  // Ideen-Formular via Fetch zu FormSubmit (bleibt auf der Seite)
+  const form = document.getElementById('idea-form');
+  if(form){
+    form.addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const msg = document.getElementById('idea-msg');
+      msg.textContent = 'Sende ...'; msg.className='muted';
+      try{
+        const data = new FormData(form);
+        const res = await fetch(form.action, { method:'POST', body:data, headers: { 'Accept':'application/json' } });
+        if(res.ok){
+          msg.textContent = 'Danke! Deine Idee wurde gesendet 🙌'; msg.className='ok';
+          form.reset();
+        }else{
+          msg.textContent = 'Leider fehlgeschlagen. Versuche es später nochmal.'; msg.className='err';
+        }
+      }catch(err){
+        msg.textContent = 'Netzwerkfehler. Bitte später erneut versuchen.'; msg.className='err';
+      }
+    });
+  }
+
+  // Start
+  renderFavs();
+  loadFact();
 </script>
 </body>
 </html>
 """
 
-# -------------------------------------------------
-#  Spaß-Fakten (ein paar Beispiele + Kategorien)
-# -------------------------------------------------
-FACTS = {
-    "lustig": [
-        "Kühe haben beste Freunde und werden gestresst, wenn man sie trennt. 🐄❤️",
-        "Wenn Katzen glücklich sind, treten sie mit ihren Pfoten – als würden sie Teig kneten. 🐱🍞",
-        "Eine Schnecke kann bis zu drei Jahre schlafen. 😴🐌",
-    ],
-    "tiere": [
-        "Tintenfische haben drei Herzen. 🐙",
-        "Pinguine machen ihren Partnern Heiratsanträge mit einem Kieselstein. 🐧💎",
-        "Eine Honigbiene besucht bis zu 500 Blumen am Tag. 🐝🌼",
-    ],
-    "wissenschaft": [
-        "Wasser kann gleichzeitig kochen und frieren – Triple Point! 💧",
-        "Banane ist leicht radioaktiv (Kalium-40). 🍌",
-        "Menschen und Giraffen haben die gleiche Anzahl an Halswirbeln: 7. 🦒",
-    ],
-    "misc": [
-        "Die erste Webseite der Welt ist immer noch online (info.cern.ch). 🌐",
-        "„Monty Python“ gab der Programmiersprache Python ihren Namen – nicht die Schlange. 🐍",
-        "Der Eiffelturm wird im Sommer bis zu 15 cm höher (Wärmeausdehnung). 🗼",
-    ]
-}
-
-ALL_FACTS = [f for arr in FACTS.values() for f in arr]
-
-# -------------------------------------------------
-#  Routes
-# -------------------------------------------------
-@app.route("/", methods=["GET"])
+@app.route("/")
 def home():
-    return render_template_string(HTML)
+    return render_template_string(HTML, formsubmit_url=FORMSUBMIT_URL)
 
 @app.route("/api/fact")
-def api_fact():
-    cat = (request.args.get("cat") or "random").lower()
-    if cat == "random" or cat not in FACTS:
-        fact = random.choice(ALL_FACTS)
+def fact_api():
+    cat = request.args.get("cat", "random").lower()
+    if cat == "random":
+        text = random.choice(ALL_FACTS)
     else:
-        fact = random.choice(FACTS[cat])
-    return jsonify({"fact": fact})
-
-@app.route("/send_idea", methods=["POST"])
-def send_idea():
-    """Nimmt JSON {name, idea} entgegen und sendet E-Mail.
-       Gibt {ok:true} zurück, wenn erfolgreich.
-    """
-    data = request.get_json(silent=True) or {}
-    name = (data.get("name") or "").strip() or "Anonym"
-    idea = (data.get("idea") or "").strip()
-
-    if not idea:
-        return jsonify({"ok": False, "error": "Idee fehlt."}), 400
-
-    # Prüfen, ob Mail konfiguriert ist
-    required = [
-        app.config.get("MAIL_SERVER"),
-        app.config.get("MAIL_DEFAULT_SENDER"),
-        app.config.get("MAIL_USERNAME"),
-        app.config.get("MAIL_PASSWORD"),
-    ]
-    if any(not v for v in required):
-        return jsonify({"ok": False, "error": "Mailer nicht konfiguriert."}), 200
-
-    try:
-        subject = "Neue Website-Idee von {}".format(name)
-        body = f"Name: {name}\n\nIdee:\n{idea}\n\n— aaron-sigma.de"
-        msg = Message(subject=subject, recipients=[MAIL_TO], body=body)
-        mail.send(msg)
-        return jsonify({"ok": True})
-    except Exception as e:
-        return jsonify({"ok": False, "error": str(e)}), 200
-
-
-# Optional: einfacher Test-Endpoint zum Prüfen der Mail-Config
-@app.route("/testmail")
-def testmail():
-    """ /testmail?to=foo@bar.de """
-    to = request.args.get("to") or MAIL_TO
-    try:
-        msg = Message(subject="Testmail von aaron-sigma.de",
-                      recipients=[to],
-                      body="Wenn diese Mail ankommt, ist die Mail-Konfiguration okay. ✨")
-        mail.send(msg)
-        return "OK – Mail verschickt an {}".format(to)
-    except Exception as e:
-        return "Fehler: {}".format(e), 500
-
+        if cat not in FACTS:
+            cat = random.choice(list(FACTS.keys()))
+        text = random.choice(FACTS[cat])
+    return jsonify({"fact": text})
 
 if __name__ == "__main__":
-    # Lokaler Start (Render startet über gunicorn)
-    app.run(host="0.0.0.0", port=5000, debug=False)
+    app.run(host="0.0.0.0", port=5000, debug=True)
