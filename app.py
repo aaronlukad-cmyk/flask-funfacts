@@ -73,14 +73,13 @@ BASE = r"""
 
   /* Roulette Wheel */
   .roulette-wrap{display:flex;justify-content:center;align-items:center;margin:10px 0}
-  .wheel{position:relative;width:260px;height:260px}
+  .wheel{position:relative;width:300px;height:300px}
   .wheel-disc{
     position:absolute;inset:0;border-radius:50%;
     /* 37 Segmente: 0 (grün) + 36 rot/schwarz abwechselnd */
     background:
       conic-gradient(
         #0fbf3a 0 9.73deg,
-        /* ab hier 36 Felder rot/schwarz (nur Optik) */
         #c1121f 9.73deg 19.46deg, #111 19.46deg 29.19deg, #c1121f 29.19deg 38.92deg, #111 38.92deg 48.65deg,
         #c1121f 48.65deg 58.38deg, #111 58.38deg 68.11deg, #c1121f 68.11deg 77.84deg, #111 77.84deg 87.57deg,
         #c1121f 87.57deg 97.3deg,  #111 97.3deg 107.03deg, #c1121f 107.03deg 116.76deg, #111 116.76deg 126.49deg,
@@ -91,16 +90,28 @@ BASE = r"""
         #c1121f 282.17deg 291.9deg,  #111 291.9deg 301.63deg, #c1121f 301.63deg 311.36deg, #111 311.36deg 321.09deg,
         #c1121f 321.09deg 330.82deg, #111 330.82deg 340.55deg, #c1121f 340.55deg 350.28deg, #111 350.28deg 360deg
       );
-    border:10px solid #2d3c6a;
+    border:12px solid #2d3c6a;
   }
+  .wheel-label{
+    position:absolute; left:50%; top:50%; width:0; height:0; transform-origin:0 0;
+    font-weight:800; font-size:12px; color:#eee;
+  }
+  .wheel-label span{
+    display:inline-block; transform:translate(118px, -6px) rotate(var(--r-rev));
+    min-width:20px; text-align:center; padding:2px 4px; border-radius:4px;
+  }
+  .wheel-label.red span{ background:#c1121f; }
+  .wheel-label.black span{ background:#111; }
+  .wheel-label.green span{ background:#0fbf3a; color:#042; }
+
   .pointer{
     position:absolute;top:-6px;left:50%;transform:translateX(-50%);
     width:0;height:0;border-left:10px solid transparent;border-right:10px solid transparent;
     border-bottom:14px solid #ffc107;filter:drop-shadow(0 0 2px #000);
   }
   .ball{
-    position:absolute;inset:0;margin:auto;width:10px;height:10px;border-radius:50%;background:#fff;box-shadow:0 0 4px #000;
-    transform-origin:130px 130px;
+    position:absolute;left:50%;top:50%;width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%;background:#fff;box-shadow:0 0 4px #000;
+    transform-origin:0 0;
   }
 
   /* footer */
@@ -141,7 +152,10 @@ document.addEventListener('click',e=>{ if(!dd.contains(e.target)) dd.classList.r
 function clock(){
   const d = new Date();
   const pad=n=>(''+n).padStart(2,'0');
-  const c = document.getElementById('clock'); if(c) c.textContent=`${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  const c = document.getElementById('clock'); if(c) c.innerHTML = `
+    <span style="background:linear-gradient(90deg,#60a5fa,#a78bfa,#22d3ee);-webkit-background-clip:text;background-clip:text;color:transparent">
+      ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}
+    </span>`;
   const dt = document.getElementById('date'); if(dt) dt.textContent=d.toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'});
 }
 setInterval(clock,1000); clock();
@@ -156,7 +170,7 @@ function setBalance(v){
 }
 setBalance(getBalance());
 
-/* Codes – genau 10 Stück */
+/* Codes – 10 Stück wie gewünscht */
 const REDEEM_CODES = {
   "LEON": 100,
   "ARMIN": 101,
@@ -169,7 +183,6 @@ const REDEEM_CODES = {
   "QUARTZ": 50,
   "TITAN": 1000
 };
-
 function redeem(){
   const input=document.getElementById('code'); const msg=document.getElementById('redeem-msg');
   const code=(input?.value||'').trim().toUpperCase();
@@ -194,22 +207,17 @@ function redeem(){
 HOME = r"""
 <section id="home" class="section">
   <h2 class="title">Willkommen 👋</h2>
-  <div class="grid-2">
-    <div class="card">
-      <b>Uhrzeit</b>
-      <div id="clock" style="font-weight:900;font-size:38px;margin:6px 0 2px"></div>
-      <div id="date" class="muted"></div>
-    </div>
-
-    <div class="card">
-      <b>Navigation</b>
-      <p>Oben im Dropdown findest du <b>Fun Facts</b>, <b>Tic-Tac-Toe</b> und das <b>Casino</b> (mit Blackjack & Roulette).</p>
-    </div>
+  <div class="card" style="text-align:center">
+    <div id="clock" style="font-weight:900;font-size:54px;margin:10px 0 4px"></div>
+    <div id="date" class="muted" style="margin-bottom:10px"></div>
+    <p style="max-width:700px;margin:10px auto 4px;">
+      Wähle oben im Menü deine Seite: <b>Fun Facts</b>, <b>Tic-Tac-Toe</b> oder das <b>Casino</b> mit <b>Blackjack</b> & <b>Roulette</b>.
+    </p>
   </div>
 </section>
 """
 
-# ---------- Fun Facts Seite (lustige Fakten) ----------
+# ---------- Fun Facts Seite ----------
 FUN = r"""
 <section id="fun" class="section">
   <h2 class="title">😂 Fun Facts</h2>
@@ -240,9 +248,13 @@ const FUN_FACTS = [
   "Tintenfische können mit ihren Armen schmecken. Handschuhpflicht beim Kochen?",
   "Pinguine machen Heiratsanträge mit Kieselsteinen. 💍🐧",
   "Die Erdnuss ist keine Nuss. Und die Erdbeere keine Beere. Willkommen in der Lügenküche.",
-  "Koalas schlafen bis zu 22 Stunden am Tag. Ein Tier nach meinem Herzen. 😴"
+  "Koalas schlafen bis zu 22 Stunden am Tag. Ein Tier nach meinem Herzen. 😴",
+  "Faultiere können beim Klettern einschlafen. Produktivität: 0, Niedlichkeit: 100.",
+  "Eine Wolke kann mehr als eine Million Kilo wiegen – und ich beschwere mich über meine Einkäufe.",
+  "Hummer werden nie alt im klassischen Sinn – aber sehr teuer.",
+  "Bananen sind leicht radioaktiv. Superkräfte leider nicht inklusive.",
+  "In Norwegen gibt es einen Pinguin mit Offiziersrang.",
 ];
-
 const favKey='fun_favs_v1';
 function getFavs(){ try{return JSON.parse(localStorage.getItem(favKey)||'[]')}catch(e){return[]} }
 function setFavs(a){ localStorage.setItem(favKey, JSON.stringify(a.slice(0,50))); }
@@ -381,12 +393,12 @@ CASINO = r"""
 
   <!-- Balance & Codes NUR im Casino -->
   <div class="card" style="margin-bottom:16px">
-    <div class="row">
+    <div class="row" style="width:100%">
       <div>Guthaben: <b><span id="balance2">0</span> A$</b></div>
       <span class="sp"></span>
-      <input id="code" placeholder="Gutschein-Code">
+      <input id="code" placeholder="Gutschein-Code" style="flex:1;min-width:180px">
       <button class="btn" id="redeem">Einlösen</button>
-      <div id="redeem-msg" class="msg muted"></div>
+      <div id="redeem-msg" class="msg muted" style="flex:1"></div>
     </div>
   </div>
 
@@ -448,6 +460,7 @@ CASINO = r"""
       <div class="roulette-wrap">
         <div class="wheel" id="rl-wheel">
           <div class="wheel-disc"></div>
+          <!-- Labels werden per JS erzeugt -->
           <div class="ball" id="rl-ball"></div>
           <div class="pointer"></div>
         </div>
@@ -509,6 +522,7 @@ document.querySelectorAll('.tab-btn').forEach(b=>{
     if(deck.length<40) deck=newDeck();
     dealer=[deck.pop(),deck.pop()]; player=[deck.pop(),deck.pop()]; render();
 
+    // Beide Hände haben 2 Karten sichtbar; nur Dealer erste verdeckt
     if(total(player)===21 && total(dealer)===21){ dealerHidden=false; render(); msg.textContent='Beide Blackjack – Push.'; inRound=false; setUI(false); return; }
     if(total(player)===21){ dealerHidden=false; render(); const win=Math.floor(Number(betInput.value)*1.5); setBalance(getBalance()+Number(betInput.value)+win); msg.textContent=`Blackjack! Gewinn: ${win} A$`; inRound=false; setUI(false); return; }
   }
@@ -546,9 +560,42 @@ document.querySelectorAll('.tab-btn').forEach(b=>{
   const redNums=new Set([1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36]);
   const color=n=> n===0?'grün':(redNums.has(n)?'rot':'schwarz');
 
+  // Labels (0–36) rund ums Rad
+  function buildLabels(){
+    // Entferne alte
+    [...wheelEl.querySelectorAll('.wheel-label')].forEach(n=>n.remove());
+    const total=37, step=360/total;
+    for(let i=0;i<total;i++){
+      const lab=document.createElement('div');
+      lab.className='wheel-label';
+      const ang=i*step; // Grad
+      lab.style.transform=`rotate(${ang}deg)`;
+      lab.style.setProperty('--r-rev', `${-ang}deg`);
+      const span=document.createElement('span');
+      span.textContent=String(i);
+      if(i===0){ lab.classList.add('green'); }
+      else if(redNums.has(i)){ lab.classList.add('red'); }
+      else { lab.classList.add('black'); }
+      lab.appendChild(span);
+      wheelEl.appendChild(lab);
+    }
+  }
+  buildLabels();
+
   typeSel?.addEventListener('change',()=>{ numWrap.style.display=(typeSel.value==='single')?'inline-block':'none'; });
 
   function canBet(){ const b=Number(betInp.value||0); return b>=1 && b<=getBalance(); }
+
+  let currentWheel=0, currentBall=0; // Startwinkel
+  const step=360/37;
+  const ballRadius=130; // px vom Mittelpunkt
+
+  function setTransforms(wDeg, bDeg){
+    wheelEl.style.transform = `rotate(${wDeg}deg)`;
+    ballEl.style.transform  = `rotate(${bDeg}deg) translateX(${ballRadius}px)`;
+  }
+  // Reset initial
+  setTransforms(0, 0);
 
   function spin(){
     if(!canBet()){ msg.textContent='Nicht genug Guthaben oder ungültiger Einsatz.'; return; }
@@ -556,15 +603,16 @@ document.querySelectorAll('.tab-btn').forEach(b=>{
 
     const target=Math.floor(Math.random()*37);
     const base=360*6;
-    const wheelRot=base + (360/37)*target;
-    const ballRot=-(base*1.4 + (360/37)*target);
+    const wheelRot=currentWheel + base + step*target;
+    const ballRot =currentBall  - (base*1.4 + step*target);
 
+    // Animate
     wheelEl.style.transition='transform 3.2s cubic-bezier(.22,.61,.36,1)';
-    ballEl.style.transition='transform 3.2s cubic-bezier(.22,.61,.36,1)';
-    wheelEl.style.transform=`rotate(${wheelRot}deg)`;
-    ballEl.style.transform=`rotate(${ballRot}deg)`;
+    ballEl .style.transition='transform 3.2s cubic-bezier(.22,.61,.36,1)';
+    setTransforms(wheelRot, ballRot);
 
     setTimeout(()=>{
+      // Ergebnis
       resEl.textContent=String(target);
       const c=color(target); colEl.textContent=c;
       const t=typeSel.value; let win=0;
@@ -574,20 +622,33 @@ document.querySelectorAll('.tab-btn').forEach(b=>{
       else if(t==='black' && c==='schwarz') win=bet;
       else if(t==='even' && target!==0 && target%2===0) win=bet;
       else if(t==='odd' && target%2===1) win=bet;
-      else if(t==='dozen1' && target>=1 && target<=12) win=bet*2;
-      else if(t==='dozen2' && target>=13 && target<=24) win=bet*2;
-      else if(t==='dozen3' && target>=25 && target<=36) win=bet*2;
+      else if(t==='dozen1' && target>=1 && target<=12) win=bet*3;   // VERDREIFACHEN
+      else if(t==='dozen2' && target>=13 && target<=24) win=bet*3;  // VERDREIFACHEN
+      else if(t==='dozen3' && target>=25 && target<=36) win=bet*3;  // VERDREIFACHEN
 
       if(win>0){ setBalance(getBalance()+bet+win); msg.textContent=`Gewonnen: +${win} A$`; }
       else{ msg.textContent='Leider verloren.'; }
 
-      setTimeout(()=>{ wheelEl.style.transition='none'; ballEl.style.transition='none'; }, 200);
-    },3300);
+      // Clean reset: Transition aus, Winkel auf Mod 360 reduzieren, Reflow, dann Setzen
+      setTimeout(()=>{
+        currentWheel = (wheelRot % 360 + 360) % 360;
+        currentBall  = (ballRot  % 360 + 360) % 360;
+        wheelEl.style.transition='none';
+        ballEl .style.transition='none';
+        // auf Endwinkel (modulo) setzen
+        setTransforms(currentWheel, currentBall);
+        // Reflow erzwingen
+        void wheelEl.offsetWidth;
+        void ballEl.offsetWidth;
+      }, 100);
+    }, 3300);
   }
   spinBtn?.addEventListener('click', spin);
 
   // Balance-Zahl auch hier aktualisieren
   document.getElementById('balance2').textContent = getBalance();
+  // Redeem-Button hier aktivieren (nur Casino hat das Feld)
+  document.getElementById('redeem')?.addEventListener('click', redeem);
 })();
 </script>
 """
