@@ -291,6 +291,11 @@ setBalance(getBalance());
 const REDEEM_CODES = {
   // CODE : Betrag
   "AARON-START-1000": 1000,
+  "Leon : 100"
+  "Armin : 101"
+  "Sigma : 100"
+  "test : 1000"
+  "Sigma1 : 1000"
   // Beispiel: "AARON-PLUS-250": 250,
 };
 document.getElementById('redeem')?.addEventListener('click', ()=>{
@@ -616,3 +621,4 @@ def home():
 
 if __name__ == "__main__":
     app.run(debug=True)
+
