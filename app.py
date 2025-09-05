@@ -1,545 +1,618 @@
-from flask import Flask, jsonify, render_template_string, request, url_for
-import random
-import datetime
+from flask import Flask, render_template_string
 
 app = Flask(__name__)
 
-# ─────────────────────────────────────────────────────────────────────────────
-#  EINLÖSECODES (einmalig, serverseitig – volatile; nach Neustart wieder da)
-#  Du kannst hier beliebig Codes + Beträge eintragen. Jeder Code ist 1× einlösbar.
-VALID_CODES = {
-    "WELCOME50": 50,
-    "AARON100": 100,
-    "VIP500": 500,
-}
-# ─────────────────────────────────────────────────────────────────────────────
-
-# ─────────────────────────────────────────────────────────────────────────────
-#  IDEEN-FORMULAR (kein Setup): FormSubmit leitet an deine Mail weiter
-FORMSUBMIT_URL = "https://formsubmit.co/info@aaron-sigma.de"
-# ─────────────────────────────────────────────────────────────────────────────
-
-# ─────────────────────────────────────────────────────────────────────────────
-#  FUN FACTS
-FACTS = {
-    "lustig": [
-        "Kühe haben beste Freunde und werden gestresst, wenn man sie trennt. 🐮❤️",
-        "Ein Straußenei braucht rund 40 Minuten, um weich zu kochen. 🥚",
-        "Honig verdirbt nie — man fand essbaren Honig in Pyramiden. 🍯",
-        "Koalas schlafen bis zu 22 Stunden am Tag. 😴🐨",
-    ],
-    "tiere": [
-        "Oktopusse haben drei Herzen. 🐙",
-        "Schmetterlinge schmecken mit ihren Füßen. 🦋",
-        "Raben erkennen Gesichter und merken sie sich. 🐦",
-        "Pinguine machen Heiratsanträge mit einem Kieselstein. 🐧💎",
-    ],
-    "wissen": [
-        "Die erste Website ging 1991 online. 🌐",
-        "Der Eiffelturm wird im Sommer bis zu 15 cm höher. 🗼",
-        "Banane ist eine Beere, die Erdbeere nicht. 🍓🍌",
-        "Wasser dehnt sich beim Gefrieren aus. ❄️",
-    ],
-}
-ALL_FACTS = sum(FACTS.values(), [])
-# ─────────────────────────────────────────────────────────────────────────────
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-#  LAYOUT (Top-Navigation + Styles + Dropdown)
-LAYOUT = r"""
+HTML = r"""
 <!doctype html>
 <html lang="de">
 <head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>{{ title }}</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Aaron · Fun & Casino</title>
 <style>
   :root{
-    --bg:#0b0f14; --card:#121824; --muted:#9fb0c3; --text:#e8f1fb;
-    --primary:#4aa3ff; --accent:#22c55e; --danger:#ef4444; --yellow:#facc15; --border:#1c2433;
+    --bg:#0a1020; --card:#0e1628; --muted:#1d2740; --text:#c9d3ef; --accent:#1c70f8;
   }
-  *{box-sizing:border-box}
-  body{ margin:0; font-family:system-ui, Inter, Segoe UI, Roboto, Arial, sans-serif;
-        background:linear-gradient(180deg,#0b0f14 0%, #0d141f 100%); color:var(--text); }
-  header{ position:sticky; top:0; z-index:10; background:#0c131e; border-bottom:1px solid var(--border); }
-  .nav{ max-width:1100px; margin:0 auto; padding:12px 16px; display:flex; gap:12px; align-items:center; }
-  .brand{ font-weight:900; letter-spacing:.3px; }
-  .spacer{ flex:1 }
-  a.navlink{ color:#cfe3ff; text-decoration:none; padding:8px 12px; border-radius:10px; }
-  a.navlink:hover{ background:#101a2a; }
-  select.navsel{
-    background:#0e1420; color:#e8f1fb; border:1px solid var(--border); border-radius:10px; padding:8px 10px;
-  }
-  .wrap{ max-width:1100px; margin:24px auto; padding:0 16px; }
-  .card{ background:var(--card); border:1px solid var(--border); border-radius:16px; padding:18px; box-shadow:0 10px 28px rgba(0,0,0,.35); }
-  .muted{ color:var(--muted); }
-  .btn{ background:var(--primary); color:#021021; border:0; border-radius:12px; padding:10px 14px; font-weight:700; cursor:pointer; }
-  .btn.sec{ background:#182335; color:#e8f1fb }
-  .btn.danger{ background:#b91c1c; color:#fff }
-  .row{ display:flex; gap:12px; align-items:center; flex-wrap:wrap }
-  input,select,textarea{
-    background:#0e1420; color:#e8f1fb; border:1px solid var(--border); border-radius:10px; padding:10px 12px;
-  }
-  .grid{ display:grid; gap:16px; grid-template-columns:repeat(12, 1fr); }
-  .col-12{ grid-column: span 12; } .col-6{ grid-column: span 6; }
-  @media (max-width: 900px){ .col-6{ grid-column: span 12; } }
-  .clock{ font-variant-numeric:tabular-nums; font-size: clamp(36px, 6vw, 66px); font-weight:900; text-align:center }
-  .date{ text-align:center; color:var(--muted); margin-top:6px }
-  .fact{ font-size:20px; line-height:1.5 }
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font:16px/1.5 Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+  a{color:#9bc1ff;text-decoration:none} a:hover{text-decoration:underline}
+  .wrap{max-width:1100px;margin:0 auto;padding:16px}
+  .title{font-weight:800;margin:8px 0 16px}
+  .section{margin:24px 0}
+  .card{background:var(--card);border:1px solid var(--muted);border-radius:12px;padding:14px}
+  .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+  .btn{background:var(--accent);border:1px solid #1761d6;color:#fff;border-radius:8px;padding:8px 12px;cursor:pointer}
+  .btn[disabled]{opacity:.55;cursor:not-allowed}
+  input,select{background:#091129;color:var(--text);border:1px solid var(--muted);border-radius:8px;padding:6px 8px}
+  .muted{color:#92a0c6}
+  .msg{min-height:22px}
+  .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .hidden{display:none}
+
+  /* Navbar */
+  .nav{position:sticky;top:0;z-index:20;background:#0b1326;border-bottom:1px solid var(--muted)}
+  .nav-inner{max-width:1100px;margin:0 auto;display:flex;align-items:center;gap:14px;padding:10px 16px}
+  .brand{font-weight:900;letter-spacing:.3px}
+  .sp{flex:1}
+  .drop{position:relative}
+  .drop > button{background:#10203d;border:1px solid var(--muted);color:#eaf1ff;border-radius:8px;padding:8px 12px}
+  .menu{position:absolute;inset:auto auto auto 0;transform:translateY(8px);min-width:210px;background:#0e1628;border:1px solid var(--muted);border-radius:10px;padding:6px;display:none}
+  .menu a{display:block;padding:8px;border-radius:8px}
+  .menu a:hover{background:#0f1a34}
+  .drop.open .menu{display:block}
+
+  /* Tabs */
+  .tabs{display:flex;gap:8px;margin:8px 0 12px}
+  .tab-btn{padding:8px 12px;border:1px solid var(--muted);background:#0b1220;border-radius:8px;color:#c9d3ef;cursor:pointer}
+  .tab-btn.is-active{border-color:var(--accent);color:#fff}
+  .tab-panel{display:none}
+  .tab-panel.is-active{display:block}
+
   /* TicTacToe */
-  .ttt{ display:grid; grid-template-columns:repeat(3, 96px); gap:10px; justify-content:center }
-  .ttt button{ width:96px; height:96px; font-size:42px; font-weight:900; background:#0e1420; border:1px solid var(--border); border-radius:12px; color:#e8f1fb; cursor:pointer; }
-  .ttt .win{ background:#0f2a18; border-color:#1d6c3a; }
-  /* Casino */
-  .bank{ font-weight:900; font-size:20px }
-  .hand{ display:flex; gap:8px; flex-wrap:wrap }
-  .chip{ background:#0e1420; border:1px solid var(--border); border-radius:10px; padding:8px 10px; }
-  .tag{ background:#0e1420; border:1px solid var(--border); border-radius:8px; padding:6px 8px; min-width:36px; text-align:center; }
-  .hint{ color:#93c5fd; }
-  .tabs{ display:flex; gap:8px; margin-bottom:10px }
-  .tab{ padding:8px 12px; border-radius:10px; border:1px solid var(--border); background:#0f1624; cursor:pointer }
-  .tab.active{ background:#152035; }
+  .ttt-board{display:grid;grid-template-columns:repeat(3,92px);gap:8px;justify-content:center;margin:10px 0}
+  .ttt-cell{
+    width:92px;height:92px;border-radius:12px;border:1px solid #2d3c6a;display:flex;align-items:center;justify-content:center;
+    background:#0e162a;font-size:44px;font-weight:900;cursor:pointer;color:#fff
+  }
+  .ttt-cell:disabled{opacity:.55;cursor:not-allowed}
+  .ttt-row{display:flex;gap:12px;align-items:center;justify-content:center}
+
+  /* Blackjack */
+  .bj-table{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .hand-title{font-weight:700;margin-bottom:4px}
+  .cards{display:flex;gap:8px;flex-wrap:wrap;min-height:86px}
+  .card-ui{
+    width:60px;height:86px;border-radius:8px;border:1px solid #2a3553;
+    display:flex;flex-direction:column;justify-content:space-between;padding:6px;background:#fff;color:#111;font-weight:700;
+  }
+  .card-ui.red{color:#d90f2f}
+  .card-ui .rank{font-size:18px}
+  .card-ui .suit{font-size:20px;text-align:right}
+  .card-back{
+    width:60px;height:86px;border-radius:8px;border:1px solid #2a3553;
+    background:repeating-linear-gradient(45deg,#223,#223 6px,#2d3c6a 6px,#2d3c6a 12px);
+  }
+
+  /* Roulette Wheel */
+  .roulette-wrap{display:flex;justify-content:center;align-items:center;margin:10px 0}
+  .wheel{position:relative;width:260px;height:260px}
+  .wheel-disc{
+    position:absolute;inset:0;border-radius:50%;
+    background:conic-gradient(
+      #0a0 0 9.73deg,#000 9.73deg 19.46deg,#0a0 19.46deg 29.19deg,#000 29.19deg 38.92deg,
+      #0a0 38.92deg 48.65deg,#000 48.65deg 58.38deg,#0a0 58.38deg 68.11deg,#000 68.11deg 77.84deg,
+      #0a0 77.84deg 87.57deg,#000 87.57deg 97.3deg,#0a0 97.3deg 107.03deg,#000 107.03deg 116.76deg,
+      #0a0 116.76deg 126.49deg,#000 126.49deg 136.22deg,#0a0 136.22deg 145.95deg,#000 145.95deg 155.68deg,
+      #0a0 155.68deg 165.41deg,#000 165.41deg 175.14deg,#0a0 175.14deg 184.87deg,#000 184.87deg 194.6deg,
+      #0a0 194.6deg 204.33deg,#000 204.33deg 214.06deg,#0a0 214.06deg 223.79deg,#000 223.79deg 233.52deg,
+      #0a0 233.52deg 243.25deg,#000 243.25deg 252.98deg,#0a0 252.98deg 262.71deg,#000 262.71deg 272.44deg,
+      #0a0 272.44deg 282.17deg,#000 282.17deg 291.9deg,#0a0 291.9deg 301.63deg,#000 301.63deg 311.36deg,
+      #0a0 311.36deg 321.09deg,#000 321.09deg 330.82deg,#0a0 330.82deg 340.55deg,#000 340.55deg 350.28deg,
+      #0a0 350.28deg 360deg);
+    border:10px solid #2d3c6a;
+  }
+  .pointer{
+    position:absolute;top:-6px;left:50%;transform:translateX(-50%);
+    width:0;height:0;border-left:10px solid transparent;border-right:10px solid transparent;
+    border-bottom:14px solid #ffc107;filter:drop-shadow(0 0 2px #000);
+  }
+  .ball{
+    position:absolute;inset:0;margin:auto;width:10px;height:10px;border-radius:50%;background:#fff;box-shadow:0 0 4px #000;
+    transform-origin:130px 130px;
+  }
+
+  /* footer */
+  footer{margin:40px 0 10px;text-align:center;color:#8fa0c8}
 </style>
 </head>
 <body>
-<header>
-  <nav class="nav">
+
+<!-- NAV -->
+<nav class="nav">
+  <div class="nav-inner">
     <div class="brand">aaron-sigma.de</div>
-    <a href="{{ url_for('home') }}" class="navlink">Start</a>
-    <a href="{{ url_for('page_fun') }}" class="navlink">Fun Facts</a>
-    <a href="{{ url_for('page_ttt') }}" class="navlink">Tic-Tac-Toe</a>
-    <a href="{{ url_for('page_casino') }}" class="navlink">Casino</a>
-    <div class="spacer"></div>
-    <select class="navsel" id="navsel">
-      <option value="{{ url_for('home') }}">Start</option>
-      <option value="{{ url_for('page_fun') }}">Fun Facts</option>
-      <option value="{{ url_for('page_ttt') }}">Tic-Tac-Toe</option>
-      <option value="{{ url_for('page_casino') }}">Casino</option>
-    </select>
-  </nav>
-</header>
+    <div class="sp"></div>
+    <div class="drop" id="dd">
+      <button type="button">Bereiche ▾</button>
+      <div class="menu">
+        <a href="#home">🏠 Start</a>
+        <a href="#tictactoe">❌⭕ Tic-Tac-Toe</a>
+        <a href="#casino">🎰 Casino</a>
+        <a href="#casino" onclick="showTab('blackjack')"> • Blackjack</a>
+        <a href="#casino" onclick="showTab('roulette')"> • Roulette</a>
+      </div>
+    </div>
+  </div>
+</nav>
 
 <div class="wrap">
-  {{ body|safe }}
+  <section id="home" class="section">
+    <h2 class="title">Willkommen 👋</h2>
+    <div class="grid-2">
+      <div class="card">
+        <b>Uhrzeit</b>
+        <div id="clock" style="font-weight:900;font-size:38px;margin:6px 0 2px"></div>
+        <div id="date" class="muted"></div>
+      </div>
+
+      <div class="card">
+        <b>Guthaben</b>
+        <div class="row">
+          <div>Aktuell: <b><span id="balance">0</span> A$</b></div>
+        </div>
+        <div class="row">
+          <input id="code" placeholder="Gutschein-Code">
+          <button class="btn" id="redeem">Einlösen</button>
+          <div id="redeem-msg" class="msg muted"></div>
+        </div>
+        <div class="muted" style="margin-top:6px">Tipp: Start-Code <code>AARON-START-1000</code> (+1000 A$)</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TICTACTOE -->
+  <section id="tictactoe" class="section">
+    <h2 class="title">❌⭕ Tic-Tac-Toe</h2>
+    <div class="card">
+      <div class="ttt-row">
+        <label>Modus:
+          <select id="ttt-level">
+            <option value="easy">Leicht</option>
+            <option value="normal">Normal</option>
+            <option value="hard">Schwer</option>
+            <option value="impossible" selected>Unmöglich</option>
+          </select>
+        </label>
+        <button class="btn" id="ttt-new">Neue Runde</button>
+        <div id="ttt-msg" class="msg muted"></div>
+      </div>
+      <div class="ttt-board" id="board">
+        <!-- 9 Zellen -->
+      </div>
+    </div>
+  </section>
+
+  <!-- CASINO -->
+  <section id="casino" class="section">
+    <h2 class="title">🎰 Casino</h2>
+    <div class="card" style="margin-bottom:16px">
+      Guthaben: <b><span id="balance2">0</span> A$</b>
+    </div>
+
+    <div class="tabs">
+      <button class="tab-btn is-active" data-tab="blackjack">Blackjack</button>
+      <button class="tab-btn" data-tab="roulette">Roulette</button>
+    </div>
+
+    <!-- BLACKJACK -->
+    <div class="tab-panel is-active" id="tab-blackjack">
+      <div class="card" style="gap:16px">
+        <div class="row">
+          <label>Einsatz: <input id="bj-bet" type="number" min="1" step="1" value="10" style="width:100px"> A$</label>
+          <button id="bj-deal" class="btn">🔄 Neue Runde</button>
+          <button id="bj-hit" class="btn" disabled>🃏 Hit</button>
+          <button id="bj-stand" class="btn" disabled>✋ Stand</button>
+        </div>
+
+        <div class="bj-table">
+          <div>
+            <div class="hand-title">Dealer</div>
+            <div id="bj-dealer" class="cards"></div>
+            <div id="bj-dealer-total" class="muted">–</div>
+          </div>
+          <div>
+            <div class="hand-title">Spieler</div>
+            <div id="bj-player" class="cards"></div>
+            <div id="bj-player-total" class="muted">–</div>
+          </div>
+        </div>
+        <div id="bj-msg" class="msg muted"></div>
+      </div>
+    </div>
+
+    <!-- ROULETTE -->
+    <div class="tab-panel" id="tab-roulette">
+      <div class="card" style="gap:16px">
+        <div class="row" style="flex-wrap:wrap">
+          <label>Einsatz:
+            <input id="rl-bet" type="number" min="1" step="1" value="10" style="width:100px"> A$
+          </label>
+          <label>Wette:
+            <select id="rl-type">
+              <option value="single">Zahl (0–36)</option>
+              <option value="red">Rot</option>
+              <option value="black">Schwarz</option>
+              <option value="even">Gerade</option>
+              <option value="odd">Ungerade</option>
+              <option value="dozen1">1st 12 (1–12)</option>
+              <option value="dozen2">2nd 12 (13–24)</option>
+              <option value="dozen3">3rd 12 (25–36)</option>
+            </select>
+          </label>
+          <label id="rl-number-wrap">Zahl:
+            <input id="rl-number" type="number" min="0" max="36" value="7" style="width:80px">
+          </label>
+          <button id="rl-spin" class="btn">🎡 Spin</button>
+        </div>
+
+        <div class="roulette-wrap">
+          <div class="wheel" id="rl-wheel">
+            <div class="wheel-disc"></div>
+            <div class="ball" id="rl-ball"></div>
+            <div class="pointer"></div>
+          </div>
+        </div>
+
+        <div>Ergebnis: Zahl <b><span id="rl-result">–</span></b>, Farbe <b><span id="rl-color">–</span></b></div>
+        <div id="rl-msg" class="msg muted"></div>
+      </div>
+    </div>
+  </section>
+
+  <footer>Made by Aaron ✨</footer>
 </div>
 
 <script>
-  document.getElementById('navsel').addEventListener('change', e => { window.location.href = e.target.value; });
+/* --------------- Dropdown --------------- */
+const dd = document.getElementById('dd');
+dd?.querySelector('button')?.addEventListener('click',()=>dd.classList.toggle('open'));
+document.addEventListener('click',e=>{ if(!dd.contains(e.target)) dd.classList.remove('open'); });
+function showTab(name){
+  document.querySelectorAll('.tab-btn').forEach(b=>{
+    if(b.dataset.tab===name){ b.classList.add('is-active'); }
+    else b.classList.remove('is-active');
+  });
+  document.querySelectorAll('.tab-panel').forEach(p=>{
+    p.classList.toggle('is-active', p.id==='tab-'+name);
+  });
+}
+
+/* --------------- Clock --------------- */
+function clock(){
+  const d = new Date();
+  const pad = n=>String(n).padStart(2,'0');
+  document.getElementById('clock').textContent =
+    `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  document.getElementById('date').textContent =
+    `${d.toLocaleDateString('de-DE',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'})}`;
+}
+setInterval(clock,1000); clock();
+
+/* --------------- Balance Helpers --------------- */
+function getBalance(){ return Number(localStorage.getItem('balance')||0); }
+function setBalance(v){
+  v = Math.max(0, Math.floor(v));
+  localStorage.setItem('balance', String(v));
+  document.getElementById('balance').textContent = v;
+  document.getElementById('balance2').textContent = v;
+}
+setBalance(getBalance());
+
+/* --------------- Codes – hier neue hinzufügen --------------- */
+const REDEEM_CODES = {
+  // CODE : Betrag
+  "AARON-START-1000": 1000,
+  // Beispiel: "AARON-PLUS-250": 250,
+};
+document.getElementById('redeem')?.addEventListener('click', ()=>{
+  const input = document.getElementById('code');
+  const msg = document.getElementById('redeem-msg');
+  const code = (input.value||'').trim().toUpperCase();
+  if(!code){ msg.textContent='Bitte Code eingeben.'; return; }
+  const amount = REDEEM_CODES[code];
+  if(!amount){ msg.textContent='Ungültiger Code.'; return; }
+  // einfache Einmalnutzung lokal
+  if(localStorage.getItem('code:'+code)){ msg.textContent='Code bereits verwendet.'; return; }
+  localStorage.setItem('code:'+code,'used');
+  setBalance(getBalance()+amount);
+  msg.textContent = `+${amount} A$ gutgeschrieben!`;
+  input.value='';
+});
+
+/* ====================  TTT  ==================== */
+const boardEl = document.getElementById('board');
+const tttMsg = document.getElementById('ttt-msg');
+const levelSel = document.getElementById('ttt-level');
+const newBtn   = document.getElementById('ttt-new');
+
+let tBoard = Array(9).fill(null); // null, 'X', 'O'
+let human='X', ai='O', tOver=false;
+
+function renderBoard(){
+  boardEl.innerHTML = '';
+  for(let i=0;i<9;i++){
+    const b = document.createElement('button');
+    b.className='ttt-cell';
+    b.textContent = tBoard[i]||'';
+    b.disabled = !!tBoard[i] || tOver;
+    b.addEventListener('click', ()=>humanMove(i));
+    boardEl.appendChild(b);
+  }
+}
+function win(b, p){
+  const L=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+  return L.some(([a,c,d])=>b[a]===p&&b[c]===p&&b[d]===p);
+}
+function emptyIdx(b){ return b.map((v,i)=>v?null:i).filter(v=>v!==null); }
+function score(b){
+  if(win(b,ai)) return 10;
+  if(win(b,human)) return -10;
+  return 0;
+}
+function minimax(b, depth, alpha, beta, maximizing, maxDepth=Infinity){
+  const scr = score(b);
+  if(scr!==0 || emptyIdx(b).length===0 || depth===maxDepth) return scr;
+
+  if(maximizing){
+    let best=-Infinity;
+    for(const i of emptyIdx(b)){
+      b[i]=ai;
+      best=Math.max(best, minimax(b,depth+1,alpha,beta,false,maxDepth));
+      b[i]=null; alpha=Math.max(alpha,best);
+      if(beta<=alpha) break;
+    }
+    return best-(depth*0.01); // kleine Präferenz für schnellere Siege
+  }else{
+    let best=+Infinity;
+    for(const i of emptyIdx(b)){
+      b[i]=human;
+      best=Math.min(best, minimax(b,depth+1,alpha,beta,true,maxDepth));
+      b[i]=null; beta=Math.min(beta,best);
+      if(beta<=alpha) break;
+    }
+    return best+(depth*0.01);
+  }
+}
+function bestMove(level){
+  // choose by difficulty
+  const empties = emptyIdx(tBoard);
+  if(level==='easy'){
+    // 70% random, sonst seichte Heuristik
+    if(Math.random()<0.7) return empties[Math.floor(Math.random()*empties.length)];
+    return heuristicMove();
+  }
+  if(level==='normal'){
+    // reines Random
+    return empties[Math.floor(Math.random()*empties.length)];
+  }
+  if(level==='hard'){
+    // Minimax – aber Depthlimit (ca. gut spielbar, aber schlagbar)
+    let bi=-1, bv=-Infinity;
+    for(const i of empties){
+      tBoard[i]=ai;
+      const val = minimax(tBoard,0,-Infinity,Infinity,false,2); // Depth 2
+      tBoard[i]=null;
+      if(val>bv){bv=val;bi=i;}
+    }
+    return bi;
+  }
+  // impossible: voll minimax
+  let bi=-1, bv=-Infinity;
+  for(const i of empties){
+    tBoard[i]=ai;
+    const val = minimax(tBoard,0,-Infinity,Infinity,false,Infinity);
+    tBoard[i]=null;
+    if(val>bv){bv=val;bi=i;}
+  }
+  return bi;
+
+  function heuristicMove(){
+    // 1) Gewinnzug?
+    for(const i of empties){ tBoard[i]=ai; if(win(tBoard,ai)){ tBoard[i]=null; return i; } tBoard[i]=null; }
+    // 2) Blocken?
+    for(const i of empties){ tBoard[i]=human; if(win(tBoard,human)){ tBoard[i]=null; return i; } tBoard[i]=null; }
+    // 3) Mitte, Ecke, Rest
+    if(tBoard[4]==null) return 4;
+    const corners=[0,2,6,8].filter(i=>tBoard[i]==null);
+    if(corners.length) return corners[Math.floor(Math.random()*corners.length)];
+    return empties[Math.floor(Math.random()*empties.length)];
+  }
+}
+function humanMove(i){
+  if(tOver||tBoard[i]) return;
+  tBoard[i]=human; renderBoard();
+  if(win(tBoard,human)){ tttMsg.textContent='Du gewinnst!'; tOver=true; return; }
+  if(emptyIdx(tBoard).length===0){ tttMsg.textContent='Unentschieden.'; tOver=true; return; }
+  const mv = bestMove(levelSel.value);
+  tBoard[mv]=ai; renderBoard();
+  if(win(tBoard,ai)){ tttMsg.textContent='Computer gewinnt.'; tOver=true; return; }
+  if(emptyIdx(tBoard).length===0){ tttMsg.textContent='Unentschieden.'; tOver=true; return; }
+}
+function tttNew(){
+  tOver=false; tBoard=Array(9).fill(null); tttMsg.textContent='';
+  renderBoard();
+  // Optional: Computer beginnt in höheren Stufen
+  if(levelSel.value==='hard' || levelSel.value==='impossible'){
+    if(Math.random()<0.5){
+      const mv = bestMove(levelSel.value);
+      tBoard[mv]=ai; renderBoard();
+    }
+  }
+}
+newBtn.addEventListener('click', tttNew);
+renderBoard();
+
+/* ====================  Casino – Tabs  ==================== */
+document.querySelectorAll('.tab-btn').forEach(b=>{
+  b.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab-btn').forEach(x=>x.classList.remove('is-active'));
+    b.classList.add('is-active');
+    document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('is-active'));
+    document.getElementById('tab-'+b.dataset.tab).classList.add('is-active');
+  });
+});
+
+/* ====================  Blackjack  ==================== */
+(function blackjack(){
+  const suits = ['♠','♥','♦','♣'];
+  const ranks = ['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
+
+  const elDealer = document.getElementById('bj-dealer');
+  const elPlayer = document.getElementById('bj-player');
+  const elDT = document.getElementById('bj-dealer-total');
+  const elPT = document.getElementById('bj-player-total');
+  const msg = document.getElementById('bj-msg');
+  const btnDeal = document.getElementById('bj-deal');
+  const btnHit  = document.getElementById('bj-hit');
+  const btnStand= document.getElementById('bj-stand');
+  const betInput= document.getElementById('bj-bet');
+
+  let deck = [];
+  let dealer = [];
+  let player = [];
+  let dealerHidden = true;
+  let inRound = false;
+
+  function newDeck(){
+    const d=[];
+    for(const s of suits){ for(const r of ranks){ d.push({r,s}); } }
+    // 6-Deck Shoe
+    return Array(6).fill(0).flatMap(()=>shuffle([...d]));
+  }
+  function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]];} return a; }
+  function val(card){ if(card.r==='A')return 11; if(['K','Q','J'].includes(card.r))return 10; return Number(card.r); }
+  function total(hand){
+    let t = hand.reduce((s,c)=>s+val(c),0);
+    let aces = hand.filter(c=>c.r==='A').length;
+    while(t>21 && aces>0){ t-=10; aces--; }
+    return t;
+  }
+  function renderCard(card, faceDown=false){
+    if(faceDown) return `<div class="card-back"></div>`;
+    const red = (card.s==='♥'||card.s==='♦')?' red':'';
+    return `<div class="card-ui${red}"><div class="rank">${card.r}</div><div class="suit">${card.s}</div></div>`;
+  }
+  function render(){
+    elPlayer.innerHTML = player.map(c=>renderCard(c)).join('');
+    elPT.textContent = total(player);
+    if(dealerHidden && dealer.length){
+      elDealer.innerHTML = renderCard(dealer[0],true) + dealer.slice(1).map(c=>renderCard(c)).join('');
+      elDT.textContent = '–';
+    }else{
+      elDealer.innerHTML = dealer.map(c=>renderCard(c)).join('');
+      elDT.textContent = total(dealer);
+    }
+  }
+  function setUI(running){ btnHit.disabled=!running; btnStand.disabled=!running; }
+  function canBet(){
+    const b=Number(betInput.value||0); return b>=1 && b<=getBalance();
+  }
+
+  function startRound(){
+    if(!canBet()){ msg.textContent='Nicht genug Guthaben oder ungültiger Einsatz.'; return; }
+    setUI(true); msg.textContent=''; inRound=true; dealerHidden=true;
+    if(deck.length<40) deck=newDeck();
+    dealer=[deck.pop(),deck.pop()]; player=[deck.pop(),deck.pop()]; render();
+
+    if(total(player)===21 && total(dealer)===21){
+      dealerHidden=false; render(); msg.textContent='Beide Blackjack – Push.'; inRound=false; setUI(false); return;
+    }
+    if(total(player)===21){
+      dealerHidden=false; render();
+      const win=Math.floor(Number(betInput.value)*1.5);
+      setBalance(getBalance()+Number(betInput.value)+win);
+      msg.textContent=`Blackjack! Gewinn: ${win} A$`; inRound=false; setUI(false); return;
+    }
+  }
+  function dealerPlay(){
+    dealerHidden=false; render();
+    while(total(dealer)<17){ dealer.push(deck.pop()); render(); }
+  }
+  function finishRound(){
+    const p=total(player), d=total(dealer), bet=Number(betInput.value);
+    if(p>21){ msg.textContent='Bust! Verloren.'; inRound=false; setUI(false); return; }
+    if(d>21){ msg.textContent='Dealer bust – du gewinnst!'; setBalance(getBalance()+bet*2); inRound=false; setUI(false); return; }
+    if(p>d){ msg.textContent='Du gewinnst!'; setBalance(getBalance()+bet*2); }
+    else if(p<d){ msg.textContent='Verloren.'; }
+    else { msg.textContent='Push – Einsatz zurück.'; setBalance(getBalance()+bet); }
+    inRound=false; setUI(false);
+  }
+
+  btnDeal?.addEventListener('click', ()=>{
+    const b=Number(betInput.value||0);
+    if(b<1){ msg.textContent='Einsatz angeben.'; return; }
+    if(b>getBalance()){ msg.textContent='Nicht genug Guthaben.'; return; }
+    setBalance(getBalance()-b); startRound();
+  });
+  btnHit?.addEventListener('click', ()=>{
+    if(!inRound) return;
+    player.push(deck.pop()); render();
+    if(total(player)>21){ dealerHidden=false; render(); msg.textContent='Bust! Verloren.'; inRound=false; setUI(false); }
+  });
+  btnStand?.addEventListener('click', ()=>{
+    if(!inRound) return;
+    dealerPlay(); finishRound();
+  });
+
+  deck=newDeck();
+})();
+
+/* ====================  Roulette  ==================== */
+(function roulette(){
+  const wheelEl=document.getElementById('rl-wheel');
+  const ballEl =document.getElementById('rl-ball');
+  const resEl  =document.getElementById('rl-result');
+  const colEl  =document.getElementById('rl-color');
+  const msg    =document.getElementById('rl-msg');
+  const spinBtn=document.getElementById('rl-spin');
+  const betInp =document.getElementById('rl-bet');
+  const typeSel=document.getElementById('rl-type');
+  const numWrap=document.getElementById('rl-number-wrap');
+  const numInp =document.getElementById('rl-number');
+
+  const redNums=new Set([1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36]);
+  const color=n=> n===0?'grün':(redNums.has(n)?'rot':'schwarz');
+
+  typeSel?.addEventListener('change',()=>{ numWrap.style.display = (typeSel.value==='single')?'inline-block':'none'; });
+
+  function canBet(){ const b=Number(betInp.value||0); return b>=1 && b<=getBalance(); }
+
+  function spin(){
+    if(!canBet()){ msg.textContent='Nicht genug Guthaben oder ungültiger Einsatz.'; return; }
+    msg.textContent=''; const bet=Number(betInp.value); setBalance(getBalance()-bet);
+
+    const target=Math.floor(Math.random()*37);
+    const base=360*6;
+    const wheelRot=base + (360/37)*target;
+    const ballRot=-(base*1.4 + (360/37)*target);
+
+    wheelEl.style.transition='transform 3.2s cubic-bezier(.22,.61,.36,1)';
+    ballEl.style.transition='transform 3.2s cubic-bezier(.22,.61,.36,1)';
+    wheelEl.style.transform=`rotate(${wheelRot}deg)`;
+    ballEl .style.transform=`rotate(${ballRot }deg)`;
+
+    setTimeout(()=>{
+      resEl.textContent=String(target);
+      const c=color(target); colEl.textContent=c;
+      const t=typeSel.value; let win=0;
+
+      if(t==='single'){ const n=Number(numInp.value); if(n===target) win=bet*35; }
+      else if(t==='red'   && c==='rot') win=bet;
+      else if(t==='black' && c==='schwarz') win=bet;
+      else if(t==='even'  && target!==0 && target%2===0) win=bet;
+      else if(t==='odd'   && target%2===1) win=bet;
+      else if(t==='dozen1'&& target>=1 && target<=12) win=bet*2;
+      else if(t==='dozen2'&& target>=13&& target<=24) win=bet*2;
+      else if(t==='dozen3'&& target>=25&& target<=36) win=bet*2;
+
+      if(win>0){ setBalance(getBalance()+bet+win); msg.textContent=`Gewonnen: +${win} A$`; }
+      else{ msg.textContent='Leider verloren.'; }
+
+      setTimeout(()=>{ wheelEl.style.transition='none'; ballEl.style.transition='none'; }, 200);
+    },3300);
+  }
+  spinBtn?.addEventListener('click', spin);
+})();
+
+/* keep balance mirrored */
+document.addEventListener('DOMContentLoaded', ()=>{ document.getElementById('balance2').textContent=getBalance(); });
 </script>
-
-{{ extra|safe }}
-
 </body>
 </html>
 """
 
-def render_page(title, body_html, extra_script=""):
-    return render_template_string(LAYOUT, title=title, body=body_html, extra=extra_script)
-
-# ─────────────────────────────────────────────────────────────────────────────
-#  STARTSEITE
 @app.route("/")
 def home():
-    body = f"""
-      <div class='grid'>
-        <section class='col-6 card'>
-          <h2>Willkommen 👋</h2>
-          <p class='muted'>Wähle oben im Menü: <b>Fun Facts</b>, <b>Tic-Tac-Toe</b> oder <b>Casino</b>.</p>
-          <p>Hier bauen wir dein kleines Universum: Uhrzeit, Spiele & Aaron Dollar 🪙</p>
-        </section>
+    return render_template_string(HTML)
 
-        <section class='col-6 card'>
-          <h2>⏰ Uhr & Datum</h2>
-          <div class='clock' id='clk'>--:--:--</div>
-          <div class='date' id='dat'>--.--.----</div>
-        </section>
-
-        <section class='col-12 card'>
-          <h2>💡 Ideen einsenden</h2>
-          <form action="{FORMSUBMIT_URL}" method="POST" class="row" style="align-items:flex-start">
-            <input type="hidden" name="_subject" value="Neue Idee von aaron-sigma.de">
-            <input type="hidden" name="_captcha" value="false">
-            <input type="hidden" name="_template" value="box">
-            <input type="hidden" name="_next" value="https://aaron-sigma.de/?thanks=1">
-            <input type="text" name="name" placeholder="Dein Name" required style="flex:1;min-width:160px">
-            <input type="text" name="message" placeholder="Deine Idee..." required style="flex:3;min-width:220px">
-            <button class="btn" type="submit">✉️ Absenden</button>
-          </form>
-          <p class='muted' style='margin-top:6px'>Beim allerersten Eintrag bitte die Bestätigungs-Mail von FormSubmit bestätigen.</p>
-        </section>
-      </div>
-    """
-    extra = """
-    <script>
-      function two(n){return String(n).padStart(2,'0')}
-      function tick(){
-        const d=new Date();
-        document.getElementById('clk').textContent = `${two(d.getHours())}:${two(d.getMinutes())}:${two(d.getSeconds())}`;
-        document.getElementById('dat').textContent = `${two(d.getDate())}.${two(d.getMonth()+1)}.${d.getFullYear()}`;
-      }
-      setInterval(tick,1000); tick();
-    </script>
-    """
-    return render_page("Start · aaron-sigma.de", body, extra)
-
-# ─────────────────────────────────────────────────────────────────────────────
-#  FUN FACTS
-@app.route("/fun")
-def page_fun():
-    body = """
-    <section class="card">
-      <h2>✨ Fun Facts</h2>
-      <div class="row" style="margin:10px 0">
-        <label>Kategorie:
-          <select id="cat" style="margin-left:8px">
-            <option value="random">Zufällig</option>
-            <option value="lustig">Lustig</option>
-            <option value="tiere">Tiere</option>
-            <option value="wissen">Wissen</option>
-          </select>
-        </label>
-        <button id="btn" class="btn">🎲 Neuen Fakt</button>
-        <button id="copy" class="btn sec">📋 Kopieren</button>
-        <button id="fav" class="btn sec">⭐ Favorit</button>
-      </div>
-      <div id="fact" class="fact card" style="padding:14px">Klick auf „Neuen Fakt“ 🙂</div>
-
-      <h3 style="margin-top:18px">⭐ Favoriten</h3>
-      <div class="row" style="margin:6px 0">
-        <button id="clear" class="btn sec">🗑️ Leeren</button>
-      </div>
-      <div id="favs" class="grid" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr))"></div>
-    </section>
-    """
-    extra = """
-    <script>
-      const favKey='aaron_favs';
-      function getFavs(){try{return JSON.parse(localStorage.getItem(favKey)||'[]')}catch(e){return[]}}
-      function setFavs(a){localStorage.setItem(favKey,JSON.stringify(a.slice(0,50)))}
-      function renderFavs(){
-        const box=document.getElementById('favs'); box.innerHTML='';
-        getFavs().forEach(f=>{ const d=document.createElement('div'); d.className='card'; d.textContent=f; box.appendChild(d); });
-      }
-      async function loadFact(){
-        const cat=document.getElementById('cat').value;
-        const url=cat==='random'?'/api/fact':`/api/fact?cat=${encodeURIComponent(cat)}`;
-        const r=await fetch(url); const j=await r.json();
-        document.getElementById('fact').textContent=j.fact;
-      }
-      document.getElementById('btn').onclick=loadFact;
-      document.getElementById('cat').onchange=loadFact;
-      document.getElementById('copy').onclick=async()=>{try{await navigator.clipboard.writeText(document.getElementById('fact').textContent)}catch(e){}};
-      document.getElementById('fav').onclick=()=>{ const t=document.getElementById('fact').textContent.trim(); if(!t) return; const a=getFavs(); if(!a.includes(t)){a.unshift(t); setFavs(a); renderFavs();} }
-      document.getElementById('clear').onclick=()=>{localStorage.removeItem(favKey); renderFavs();}
-      renderFavs(); loadFact();
-    </script>
-    """
-    return render_page("Fun Facts · aaron-sigma.de", body, extra)
-
-@app.get("/api/fact")
-def api_fact():
-    cat = (request.args.get("cat") or "random").lower()
-    if cat == "random" or cat not in FACTS:
-        fact = random.choice(ALL_FACTS)
-    else:
-        fact = random.choice(FACTS[cat])
-    return jsonify({"fact": fact})
-
-# ─────────────────────────────────────────────────────────────────────────────
-#  TIC-TAC-TOE
-@app.route("/tictactoe")
-def page_ttt():
-    body = """
-    <section class="card">
-      <h2>🎮 Tic-Tac-Toe</h2>
-      <div class="muted" id="ttt-status">Du bist X. Computer ist O.</div>
-      <div class="ttt" id="ttt"></div>
-      <div class="row" style="margin-top:10px">
-        <button class="btn" id="ttt-reset">Neu starten</button>
-      </div>
-    </section>
-    """
-    extra = """
-    <script>
-      // Starker Bot (Minimax)
-      const ttt = document.getElementById('ttt');
-      let board = Array(9).fill('');
-      const HUMAN = 'X', AI = 'O';
-      const wins = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
-      let lock = false;
-
-      function draw(){
-        ttt.innerHTML='';
-        board.forEach((val,i)=>{
-          const b = document.createElement('button');
-          b.textContent = val;
-          b.addEventListener('click', ()=>humanMove(i));
-          ttt.appendChild(b);
-        });
-      }
-      function emptyIdx(b){ return b.map((v,i)=>v===''?i:null).filter(i=>i!==null); }
-      function winnerOf(b){ for(const [a,b2,c] of wins){ if(b[a] && b[a]===b[b2] && b[b2]===b[c]) return b[a]; } return null; }
-      function winLine(b){ for(const L of wins){ const [a,b2,c]=L; if(b[a] && b[a]===b[b2] && b[b2]===b[c]) return L; } return null; }
-      function endGame(res){
-        lock = true;
-        if(res==='draw'){ document.getElementById('ttt-status').textContent = 'Unentschieden!'; return; }
-        const line = winLine(board) || [];
-        document.getElementById('ttt-status').textContent = `${res} gewinnt!`;
-        [...ttt.children].forEach((btn,i)=>{ if(line.includes(i)) btn.classList.add('win'); });
-      }
-      function humanMove(i){
-        if(lock || board[i] || winnerOf(board)) return;
-        board[i]=HUMAN; draw();
-        const w=winnerOf(board); if(w){ endGame(w); return; }
-        if(emptyIdx(board).length===0){ endGame('draw'); return; }
-        lock = true; document.getElementById('ttt-status').textContent='Computer denkt …';
-        setTimeout(aiMove, 200);
-      }
-      function aiMove(){
-        const best = minimax(board.slice(), AI, 0);
-        board[best.index] = AI; draw(); lock=false;
-        const w=winnerOf(board); if(w){ endGame(w); return; }
-        if(emptyIdx(board).length===0){ endGame('draw'); return; }
-        document.getElementById('ttt-status').textContent='Du bist X. Computer ist O.';
-      }
-      function minimax(b, player, depth){
-        const w = winnerOf(b);
-        if(w===AI) return {score:10-depth};
-        if(w===HUMAN) return {score:depth-10};
-        const em = emptyIdx(b);
-        if(!em.length) return {score:0};
-        const moves=[];
-        for(const idx of em){
-          const move={index:idx}; b[idx]=player;
-          move.score = minimax(b, player===AI?HUMAN:AI, depth+1).score;
-          b[idx]=''; moves.push(move);
-        }
-        if(player===AI){ let best=-Infinity, mv; for(const m of moves){ if(m.score>best){best=m.score;mv=m} } return mv; }
-        else{ let best=Infinity, mv; for(const m of moves){ if(m.score<best){best=m.score;mv=m} } return mv; }
-      }
-      document.getElementById('ttt-reset').onclick=()=>{board=Array(9).fill('');lock=false;draw();document.getElementById('ttt-status').textContent='Du bist X. Computer ist O.'}
-      draw();
-    </script>
-    """
-    return render_page("Tic-Tac-Toe · aaron-sigma.de", body, extra)
-
-# ─────────────────────────────────────────────────────────────────────────────
-#  CASINO – Auswahl Roulette / Blackjack + Guthaben + Code-Einlösung
-@app.route("/casino")
-def page_casino():
-    body = """
-    <section class="card">
-      <h2>🎰 Casino</h2>
-      <div class="row" style="justify-content:space-between">
-        <div class="bank">Guthaben: <span id="bank">0</span> A$</div>
-        <div class="row">
-          <input id="redeem" placeholder="Code eingeben (z.B. AARON100)"/>
-          <button class="btn sec" id="redeemBtn">Einlösen</button>
-          <button class="btn danger" id="resetBank">Reset</button>
-        </div>
-      </div>
-      <p class="muted" style="margin-top:6px">Hinweis: Guthaben wird lokal im Browser als „Aaron Dollar (A$)“ gespeichert.</p>
-
-      <div class="tabs">
-        <div class="tab active" data-tab="pick">Spiel wählen</div>
-        <div class="tab" data-tab="bj">Blackjack</div>
-        <div class="tab" data-tab="ru">Roulette</div>
-      </div>
-
-      <!-- Auswahl -->
-      <div id="tab-pick">
-        <p>Wähle dein Spiel:</p>
-        <div class="row">
-          <button class="btn" onclick="openTab('bj')">🃏 Blackjack</button>
-          <button class="btn" onclick="openTab('ru')">🎡 Roulette</button>
-        </div>
-      </div>
-
-      <!-- Blackjack -->
-      <div id="tab-bj" style="display:none">
-        <h3>🃏 Blackjack</h3>
-        <div class="row">
-          <input id="bjBet" type="number" min="1" placeholder="Einsatz (A$)"/>
-          <button class="btn sec" id="bjDeal">Deal</button>
-          <button class="btn sec" id="bjHit" disabled>Hit</button>
-          <button class="btn sec" id="bjStand" disabled>Stand</button>
-        </div>
-        <div class="row" style="margin-top:8px">
-          <div>
-            <div><b>Spieler</b> – Summe: <span id="bjPS">0</span></div>
-            <div class="hand" id="bjPH"></div>
-          </div>
-          <div>
-            <div><b>Dealer</b> – Summe: <span id="bjDS">0</span></div>
-            <div class="hand" id="bjDH"></div>
-          </div>
-        </div>
-        <p class="hint" id="bjMsg"></p>
-      </div>
-
-      <!-- Roulette -->
-      <div id="tab-ru" style="display:none">
-        <h3>🎡 Roulette</h3>
-        <div class="row">
-          <select id="ruType">
-            <option value="red">Rot (1:1)</option>
-            <option value="black">Schwarz (1:1)</option>
-            <option value="odd">Ungerade (1:1)</option>
-            <option value="even">Gerade (1:1)</option>
-            <option value="number">Zahl 0–36 (35:1)</option>
-          </select>
-          <input id="ruNum" type="number" min="0" max="36" placeholder="Zahl" style="width:100px;display:none"/>
-          <input id="ruBet" type="number" min="1" placeholder="Einsatz (A$)"/>
-          <button class="btn sec" id="ruSpin">Drehen</button>
-        </div>
-        <p class="hint" id="ruMsg"></p>
-      </div>
-    </section>
-    """
-    extra = """
-    <script>
-      // ───── Aaron Dollar (LocalStorage) ─────
-      const BANK_KEY='aaron_bank_v1';
-      const $bank = document.getElementById('bank');
-      function getBank(){ return +localStorage.getItem(BANK_KEY) || 0; }
-      function setBank(v){ localStorage.setItem(BANK_KEY, Math.max(0, Math.floor(v))); updateBank(); }
-      function addBank(v){ setBank(getBank()+Math.floor(v)); }
-      function subBank(v){ setBank(getBank()-Math.floor(v)); }
-      function updateBank(){ $bank.textContent = getBank(); }
-      updateBank();
-
-      // Reset
-      document.getElementById('resetBank').onclick = () => {
-        if(confirm('Guthaben wirklich zurücksetzen?')) setBank(0);
-      };
-
-      // Codes einlösen → Server prüft, einmalig
-      document.getElementById('redeemBtn').onclick = async () => {
-        const code = (document.getElementById('redeem').value || '').trim();
-        if(!code) return;
-        const r = await fetch('/api/redeem', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({code})});
-        const j = await r.json();
-        if(j.ok){ addBank(j.amount); alert(`✅ +${j.amount} A$ gutgeschrieben!`); document.getElementById('redeem').value=''; }
-        else { alert('❌ ' + (j.error || 'Code ungültig')); }
-      };
-
-      // Tabs
-      const tabs = [...document.querySelectorAll('.tab')];
-      function openTab(key){
-        tabs.forEach(t=>t.classList.toggle('active', t.dataset.tab===key || (key==='pick'&&t.dataset.tab==='pick')));
-        document.getElementById('tab-pick').style.display = key==='pick'?'block':'none';
-        document.getElementById('tab-bj').style.display = key==='bj'?'block':'none';
-        document.getElementById('tab-ru').style.display = key==='ru'?'block':'none';
-      }
-      tabs.forEach(t=>t.onclick=()=>openTab(t.dataset.tab));
-
-      // ───── Blackjack ─────
-      const bjPH=document.getElementById('bjPH'), bjDH=document.getElementById('bjDH');
-      const bjPS=document.getElementById('bjPS'), bjDS=document.getElementById('bjDS');
-      const bjMsg=document.getElementById('bjMsg');
-      const bjBet=document.getElementById('bjBet');
-      const bjDeal=document.getElementById('bjDeal'), bjHit=document.getElementById('bjHit'), bjStand=document.getElementById('bjStand');
-
-      let deck=[], pHand=[], dHand=[], inRound=false, bet=0;
-
-      function newDeck(){
-        const ranks=['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
-        const suits=['♠','♥','♦','♣'];
-        deck=[];
-        for(const r of ranks){ for(const s of suits){ deck.push(r+s); } }
-        for(let i=deck.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [deck[i],deck[j]]=[deck[j],deck[i]]; }
-      }
-      function valCard(c){ const r=c.slice(0,-1); if(r==='A') return 11; if(['K','Q','J'].includes(r)) return 10; return +r; }
-      function sum(hand){ let s=hand.reduce((a,c)=>a+valCard(c),0); let aces=hand.filter(c=>c[0]==='A').length; while(s>21 && aces>0){ s-=10; aces--; } return s; }
-      function render(){
-        bjPH.innerHTML=''; bjDH.innerHTML='';
-        pHand.forEach(c=>{ const t=document.createElement('div'); t.className='tag'; t.textContent=c; bjPH.appendChild(t); });
-        dHand.forEach(c=>{ const t=document.createElement('div'); t.className='tag'; t.textContent=c; bjDH.appendChild(t); });
-        bjPS.textContent=sum(pHand); bjDS.textContent=sum(dHand);
-      }
-      function end(msg, delta){
-        inRound=false; bjHit.disabled=bjStand.disabled=true; bjDeal.disabled=false;
-        bjMsg.textContent=msg;
-        if(delta>0) addBank(delta);
-        if(delta<0) subBank(-delta);
-      }
-
-      bjDeal.onclick=()=>{
-        bet = Math.max(1, Math.floor(+bjBet.value||0));
-        if(getBank() < bet){ alert('Zu wenig Guthaben.'); return; }
-        // Einsatz wird erst bei Ausgang verrechnet (bei Verlust abgezogen, bei Gewinn addiert)
-        newDeck(); pHand=[deck.pop(),deck.pop()]; dHand=[deck.pop(),deck.pop()];
-        inRound=true; bjHit.disabled=bjStand.disabled=false; bjDeal.disabled=true; bjMsg.textContent='';
-        render();
-        if(sum(pHand)===21){ // Natural
-          const dealerBJ = (sum(dHand)===21);
-          if(dealerBJ) end('Push (beide Blackjack).', 0);
-          else end('Blackjack! Gewinn 1.5× Einsatz.', Math.floor(bet*1.5));
-        }
-      };
-      bjHit.onclick=()=>{
-        if(!inRound) return;
-        pHand.push(deck.pop()); render();
-        if(sum(pHand)>21) end('Bust! Du verlierst den Einsatz.', -bet);
-      };
-      bjStand.onclick=()=>{
-        if(!inRound) return;
-        // Dealer zieht bis 17
-        while(sum(dHand)<17){ dHand.push(deck.pop()); }
-        render();
-        const ps=sum(pHand), ds=sum(dHand);
-        if(ds>21) end('Dealer bust – du gewinnst!', bet);
-        else if(ps>ds) end('Du gewinnst!', bet);
-        else if(ps<ds) end('Dealer gewinnt.', -bet);
-        else end('Push. Einsatz zurück.', 0);
-      };
-
-      // ───── Roulette ─────
-      const redSet = new Set([1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36]);
-      const ruType=document.getElementById('ruType'), ruNum=document.getElementById('ruNum'), ruBet=document.getElementById('ruBet'), ruMsg=document.getElementById('ruMsg');
-      ruType.onchange = ()=>{ ruNum.style.display = (ruType.value==='number')?'inline-block':'none'; };
-      document.getElementById('ruSpin').onclick=()=>{
-        const bet = Math.max(1, Math.floor(+ruBet.value||0));
-        if(getBank()<bet) { alert('Zu wenig Guthaben.'); return; }
-        const n = Math.floor(Math.random()*37); // 0–36
-        let win = 0, txt = `Gefallen: ${n} ${n===0?'(grün)':''}`;
-        if(ruType.value==='number'){
-          const pick = Math.max(0, Math.min(36, Math.floor(+ruNum.value||-1)));
-          if(pick===n) win = bet*35;
-        }else if(ruType.value==='red'){
-          if(n!==0 && redSet.has(n)) win = bet;
-        }else if(ruType.value==='black'){
-          if(n!==0 && !redSet.has(n)) win = bet;
-        }else if(ruType.value==='odd'){
-          if(n!==0 && n%2===1) win = bet;
-        }else if(ruType.value==='even'){
-          if(n!==0 && n%2===0) win = bet;
-        }
-        if(win>0){ addBank(win); txt += ` – Gewinn: +${win} A$`; }
-        else { subBank(bet); txt += ` – Verlust: -${bet} A$`; }
-        ruMsg.textContent = txt;
-      };
-
-      // Standard: Auswahl-Tab
-      openTab('pick');
-    </script>
-    """
-    return render_page("Casino · aaron-sigma.de", body, extra)
-
-# Redeem-API: prüft Code einmalig und gibt Betrag zurück
-@app.post("/api/redeem")
-def api_redeem():
-    data = request.get_json(silent=True) or {}
-    code = (data.get("code") or "").strip().upper()
-    if not code:
-        return jsonify({"ok": False, "error": "Kein Code übergeben."}), 400
-    amount = VALID_CODES.pop(code, None)
-    if amount is None:
-        return jsonify({"ok": False, "error": "Ungültiger oder bereits benutzter Code."}), 200
-    return jsonify({"ok": True, "amount": int(amount)})
-
-# ─────────────────────────────────────────────────────────────────────────────
-#  BOOTSTRAP
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    app.run(debug=True)
