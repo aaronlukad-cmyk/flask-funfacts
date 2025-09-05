@@ -21,7 +21,7 @@ BASE = r"""
   .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
   .btn{background:var(--accent);border:1px solid #1761d6;color:#fff;border-radius:8px;padding:8px 12px;cursor:pointer}
   .btn[disabled]{opacity:.55;cursor:not-allowed}
-  input,select{background:#091129;color:var(--text);border:1px solid var(--muted);border-radius:8px;padding:6px 8px}
+  input,select,textarea{background:#091129;color:var(--text);border:1px solid var(--muted);border-radius:8px;padding:6px 8px}
   .muted{color:#92a0c6}
   .msg{min-height:22px}
   .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
@@ -76,17 +76,21 @@ BASE = r"""
   .wheel{position:relative;width:260px;height:260px}
   .wheel-disc{
     position:absolute;inset:0;border-radius:50%;
-    background:conic-gradient(
-      #0a0 0 9.73deg,#000 9.73deg 19.46deg,#0a0 19.46deg 29.19deg,#000 29.19deg 38.92deg,
-      #0a0 38.92deg 48.65deg,#000 48.65deg 58.38deg,#0a0 58.38deg 68.11deg,#000 68.11deg 77.84deg,
-      #0a0 77.84deg 87.57deg,#000 87.57deg 97.3deg,#0a0 97.3deg 107.03deg,#000 107.03deg 116.76deg,
-      #0a0 116.76deg 126.49deg,#000 126.49deg 136.22deg,#0a0 136.22deg 145.95deg,#000 145.95deg 155.68deg,
-      #0a0 155.68deg 165.41deg,#000 165.41deg 175.14deg,#0a0 175.14deg 184.87deg,#000 184.87deg 194.6deg,
-      #0a0 194.6deg 204.33deg,#000 204.33deg 214.06deg,#0a0 214.06deg 223.79deg,#000 223.79deg 233.52deg,
-      #0a0 233.52deg 243.25deg,#000 243.25deg 252.98deg,#0a0 252.98deg 262.71deg,#000 262.71deg 272.44deg,
-      #0a0 272.44deg 282.17deg,#000 282.17deg 291.9deg,#0a0 291.9deg 301.63deg,#000 301.63deg 311.36deg,
-      #0a0 311.36deg 321.09deg,#000 321.09deg 330.82deg,#0a0 330.82deg 340.55deg,#000 340.55deg 350.28deg,
-      #0a0 350.28deg 360deg);
+    /* 37 Segmente: 0 (grün) + 36 rot/schwarz abwechselnd */
+    background:
+      conic-gradient(
+        #0fbf3a 0 9.73deg,
+        /* ab hier 36 Felder rot/schwarz (nur Optik) */
+        #c1121f 9.73deg 19.46deg, #111 19.46deg 29.19deg, #c1121f 29.19deg 38.92deg, #111 38.92deg 48.65deg,
+        #c1121f 48.65deg 58.38deg, #111 58.38deg 68.11deg, #c1121f 68.11deg 77.84deg, #111 77.84deg 87.57deg,
+        #c1121f 87.57deg 97.3deg,  #111 97.3deg 107.03deg, #c1121f 107.03deg 116.76deg, #111 116.76deg 126.49deg,
+        #c1121f 126.49deg 136.22deg, #111 136.22deg 145.95deg, #c1121f 145.95deg 155.68deg, #111 155.68deg 165.41deg,
+        #c1121f 165.41deg 175.14deg, #111 175.14deg 184.87deg, #c1121f 184.87deg 194.6deg, #111 194.6deg 204.33deg,
+        #c1121f 204.33deg 214.06deg, #111 214.06deg 223.79deg, #c1121f 223.79deg 233.52deg, #111 233.52deg 243.25deg,
+        #c1121f 243.25deg 252.98deg, #111 252.98deg 262.71deg, #c1121f 262.71deg 272.44deg, #111 272.44deg 282.17deg,
+        #c1121f 282.17deg 291.9deg,  #111 291.9deg 301.63deg, #c1121f 301.63deg 311.36deg, #111 311.36deg 321.09deg,
+        #c1121f 321.09deg 330.82deg, #111 330.82deg 340.55deg, #c1121f 340.55deg 350.28deg, #111 350.28deg 360deg
+      );
     border:10px solid #2d3c6a;
   }
   .pointer{
@@ -114,6 +118,7 @@ BASE = r"""
       <button type="button">Bereiche ▾</button>
       <div class="menu">
         <a href="{{ url_for('home') }}">🏠 Start</a>
+        <a href="{{ url_for('fun') }}">😂 Fun Facts</a>
         <a href="{{ url_for('tictactoe') }}">❌⭕ Tic-Tac-Toe</a>
         <a href="{{ url_for('casino') }}">🎰 Casino</a>
       </div>
@@ -151,26 +156,32 @@ function setBalance(v){
 }
 setBalance(getBalance());
 
-/* Codes – hier neue hinzufügen */
+/* Codes – genau 10 Stück */
 const REDEEM_CODES = {
-  "AARON-START-1000": 1000,
-  // "MEGA-50": 50,
-  // "VIP-777": 777,
+  "LEON": 100,
+  "ARMIN": 101,
+  "COMET": 200,
+  "RIVER": 200,
+  "MOUNTAIN": 200,
+  "FALCON": 75,
+  "ORBIT": 75,
+  "NEBULA": 50,
+  "QUARTZ": 50,
+  "TITAN": 1000
 };
 
 function redeem(){
   const input=document.getElementById('code'); const msg=document.getElementById('redeem-msg');
-  const code=(input.value||'').trim().toUpperCase();
-  if(!code){ msg.textContent='Bitte Code eingeben.'; return; }
+  const code=(input?.value||'').trim().toUpperCase();
+  if(!code){ if(msg) msg.textContent='Bitte Code eingeben.'; return; }
   const amount=REDEEM_CODES[code];
-  if(!amount){ msg.textContent='Ungültiger Code.'; return; }
-  if(localStorage.getItem('code:'+code)){ msg.textContent='Code bereits verwendet.'; return; }
+  if(!amount){ if(msg) msg.textContent='Ungültiger Code.'; return; }
+  if(localStorage.getItem('code:'+code)){ if(msg) msg.textContent='Code bereits verwendet.'; return; }
   localStorage.setItem('code:'+code,'used');
   setBalance(getBalance()+amount);
-  msg.textContent=`+${amount} A$ gutgeschrieben!`;
-  input.value='';
+  if(msg) msg.textContent=`+${amount} A$ gutgeschrieben!`;
+  if(input) input.value='';
 }
-const rbtn=document.getElementById('redeem'); if(rbtn) rbtn.addEventListener('click',redeem);
 </script>
 
 <!-- Seiten-Skripte -->
@@ -191,19 +202,73 @@ HOME = r"""
     </div>
 
     <div class="card">
-      <b>Guthaben</b>
-      <div class="row">
-        <div>Aktuell: <b><span id="balance">0</span> A$</b></div>
-      </div>
-      <div class="row">
-        <input id="code" placeholder="Gutschein-Code">
-        <button class="btn" id="redeem">Einlösen</button>
-        <div id="redeem-msg" class="msg muted"></div>
-      </div>
-      <div class="muted" style="margin-top:6px">Tipp: Start-Code <code>AARON-START-1000</code> (+1000 A$)</div>
+      <b>Navigation</b>
+      <p>Oben im Dropdown findest du <b>Fun Facts</b>, <b>Tic-Tac-Toe</b> und das <b>Casino</b> (mit Blackjack & Roulette).</p>
     </div>
   </div>
 </section>
+"""
+
+# ---------- Fun Facts Seite (lustige Fakten) ----------
+FUN = r"""
+<section id="fun" class="section">
+  <h2 class="title">😂 Fun Facts</h2>
+  <div class="card">
+    <div class="row">
+      <button id="fact-new" class="btn">🎲 Neuen Fun Fact</button>
+      <button id="fact-copy" class="btn">📋 Kopieren</button>
+      <button id="fact-fav" class="btn">⭐ Favorit</button>
+      <button id="fact-clear" class="btn">🗑️ Favoriten leeren</button>
+    </div>
+    <div id="fact-box" class="card" style="margin-top:10px">Klick auf „Neuen Fun Fact“ 🙂</div>
+
+    <h3 style="margin-top:16px">⭐ Favoriten</h3>
+    <div id="fact-favs" class="grid-2"></div>
+  </div>
+</section>
+"""
+
+FUN_JS = r"""
+<script>
+const FUN_FACTS = [
+  "Wenn du einen Goldfisch in einen dunklen Raum stellst, wird er blasser – Mood.",
+  "Kühe haben beste Freunde und werden gestresst, wenn man sie trennt. 🐮❤️",
+  "In der Schweiz ist es illegal, nur ein Meerschweinchen zu besitzen – sie sind offiziell zu einsam alleine.",
+  "Seesterne haben kein Gehirn – und trotzdem mehr Urlaubsfotos als wir.",
+  "Schnecken haben über 14.000 Zähne. Stell dir vor, die hätten Zahnseide-Influencer.",
+  "Raben merken sich Gesichter – vergiss nie, wem du dein Brot geklaut hast. 🐦",
+  "Tintenfische können mit ihren Armen schmecken. Handschuhpflicht beim Kochen?",
+  "Pinguine machen Heiratsanträge mit Kieselsteinen. 💍🐧",
+  "Die Erdnuss ist keine Nuss. Und die Erdbeere keine Beere. Willkommen in der Lügenküche.",
+  "Koalas schlafen bis zu 22 Stunden am Tag. Ein Tier nach meinem Herzen. 😴"
+];
+
+const favKey='fun_favs_v1';
+function getFavs(){ try{return JSON.parse(localStorage.getItem(favKey)||'[]')}catch(e){return[]} }
+function setFavs(a){ localStorage.setItem(favKey, JSON.stringify(a.slice(0,50))); }
+function renderFavs(){
+  const box=document.getElementById('fact-favs'); if(!box) return;
+  box.innerHTML='';
+  getFavs().forEach(f=>{ const d=document.createElement('div'); d.className='card'; d.textContent=f; box.appendChild(d); });
+}
+function newFact(){
+  const f = FUN_FACTS[Math.floor(Math.random()*FUN_FACTS.length)];
+  const fb=document.getElementById('fact-box'); if(fb) fb.textContent=f;
+}
+document.getElementById('fact-new')?.addEventListener('click', newFact);
+document.getElementById('fact-copy')?.addEventListener('click', async ()=>{
+  const t=document.getElementById('fact-box')?.textContent||''; if(!t) return;
+  try{ await navigator.clipboard.writeText(t); }catch(e){}
+});
+document.getElementById('fact-fav')?.addEventListener('click', ()=>{
+  const t=document.getElementById('fact-box')?.textContent.trim(); if(!t) return;
+  const a=getFavs(); if(!a.includes(t)){ a.unshift(t); setFavs(a); renderFavs(); }
+});
+document.getElementById('fact-clear')?.addEventListener('click', ()=>{
+  localStorage.removeItem(favKey); renderFavs();
+});
+renderFavs(); newFact();
+</script>
 """
 
 # ---------- TicTacToe Seite ----------
@@ -313,8 +378,16 @@ renderBoard();
 CASINO = r"""
 <section id="casino" class="section">
   <h2 class="title">🎰 Casino</h2>
+
+  <!-- Balance & Codes NUR im Casino -->
   <div class="card" style="margin-bottom:16px">
-    Guthaben: <b><span id="balance2">0</span> A$</b>
+    <div class="row">
+      <div>Guthaben: <b><span id="balance2">0</span> A$</b></div>
+      <span class="sp"></span>
+      <input id="code" placeholder="Gutschein-Code">
+      <button class="btn" id="redeem">Einlösen</button>
+      <div id="redeem-msg" class="msg muted"></div>
+    </div>
   </div>
 
   <div class="tabs">
@@ -512,6 +585,9 @@ document.querySelectorAll('.tab-btn').forEach(b=>{
     },3300);
   }
   spinBtn?.addEventListener('click', spin);
+
+  // Balance-Zahl auch hier aktualisieren
+  document.getElementById('balance2').textContent = getBalance();
 })();
 </script>
 """
@@ -526,6 +602,10 @@ def render_page(title, content_html, page_js=""):
 def home():
     return render_page("Start · Aaron", HOME, "")
 
+@app.route("/fun")
+def fun():
+    return render_page("Fun Facts · Aaron", FUN, FUN_JS)
+
 @app.route("/tictactoe")
 def tictactoe():
     return render_page("Tic-Tac-Toe · Aaron", TTT, TTT_JS)
@@ -536,4 +616,4 @@ def casino():
 
 # ---------- Run ----------
 if __name__ == "__main__":
-    app.run(debug=True)
+  app.run(debug=True)
