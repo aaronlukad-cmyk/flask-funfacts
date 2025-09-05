@@ -2,16 +2,17 @@ from flask import Flask, render_template_string, url_for
 
 app = Flask(__name__)
 
-# ---------- Basis Template (Navbar, Styles, gemeinsame JS) ----------
+# ========================= Base Layout =========================
 BASE = r"""
 <!doctype html>
 <html lang="de">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>{{ title }}</title>
 <style>
   :root{ --bg:#0a1020; --card:#0e1628; --muted:#1d2740; --text:#c9d3ef; --accent:#1c70f8; }
+  *{box-sizing:border-box}
   html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font:16px/1.5 Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
   a{color:#9bc1ff;text-decoration:none} a:hover{text-decoration:underline}
   .wrap{max-width:1100px;margin:0 auto;padding:16px}
@@ -76,7 +77,6 @@ BASE = r"""
   .wheel{position:relative;width:300px;height:300px}
   .wheel-disc{
     position:absolute;inset:0;border-radius:50%;
-    /* 37 Segmente: 0 (grün) + 36 rot/schwarz abwechselnd */
     background:
       conic-gradient(
         #0fbf3a 0 9.73deg,
@@ -93,8 +93,8 @@ BASE = r"""
     border:12px solid #2d3c6a;
   }
   .wheel-label{
-    position:absolute; left:50%; top:50%; width:0; height:0; transform-origin:0 0;
-    font-weight:800; font-size:12px; color:#eee;
+    position:absolute; left:50%; top:50%; width:0; height:0; transform-origin:0 0; z-index:1;
+    font-weight:800; font-size:12px; color:#eee; pointer-events:none;
   }
   .wheel-label span{
     display:inline-block; transform:translate(118px, -6px) rotate(var(--r-rev));
@@ -107,20 +107,18 @@ BASE = r"""
   .pointer{
     position:absolute;top:-6px;left:50%;transform:translateX(-50%);
     width:0;height:0;border-left:10px solid transparent;border-right:10px solid transparent;
-    border-bottom:14px solid #ffc107;filter:drop-shadow(0 0 2px #000);
+    border-bottom:14px solid #ffc107;filter:drop-shadow(0 0 2px #000); z-index:4;
   }
   .ball{
     position:absolute;left:50%;top:50%;width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%;background:#fff;box-shadow:0 0 4px #000;
-    transform-origin:0 0;
+    transform-origin:0 0; z-index:3;
   }
 
-  /* footer */
   footer{margin:40px 0 10px;text-align:center;color:#8fa0c8}
 </style>
 </head>
 <body>
 
-<!-- NAV -->
 <nav class="nav">
   <div class="nav-inner">
     <div class="brand">aaron-sigma.de</div>
@@ -165,12 +163,11 @@ function getBalance(){ return Number(localStorage.getItem('balance')||0); }
 function setBalance(v){
   v=Math.max(0,Math.floor(v));
   localStorage.setItem('balance',String(v));
-  const ids=['balance','balance2'];
-  ids.forEach(id=>{ const el=document.getElementById(id); if(el) el.textContent=v; });
+  ['balance','balance2'].forEach(id=>{ const el=document.getElementById(id); if(el) el.textContent=v; });
 }
 setBalance(getBalance());
 
-/* Codes – 10 Stück wie gewünscht */
+/* Codes (10 Stück, inkl. Leon/Armin) */
 const REDEEM_CODES = {
   "LEON": 100,
   "ARMIN": 101,
@@ -197,13 +194,13 @@ function redeem(){
 }
 </script>
 
-<!-- Seiten-Skripte -->
 {{ page_js|safe }}
 </body>
 </html>
 """
 
-# ---------- Startseite ----------
+# ========================= Pages =========================
+
 HOME = r"""
 <section id="home" class="section">
   <h2 class="title">Willkommen 👋</h2>
@@ -211,13 +208,12 @@ HOME = r"""
     <div id="clock" style="font-weight:900;font-size:54px;margin:10px 0 4px"></div>
     <div id="date" class="muted" style="margin-bottom:10px"></div>
     <p style="max-width:700px;margin:10px auto 4px;">
-      Wähle oben im Menü deine Seite: <b>Fun Facts</b>, <b>Tic-Tac-Toe</b> oder das <b>Casino</b> mit <b>Blackjack</b> & <b>Roulette</b>.
+      Wähle oben im Menü: <b>Fun Facts</b>, <b>Tic-Tac-Toe</b> oder <b>Casino</b> (Blackjack & Roulette).
     </p>
   </div>
 </section>
 """
 
-# ---------- Fun Facts Seite ----------
 FUN = r"""
 <section id="fun" class="section">
   <h2 class="title">😂 Fun Facts</h2>
@@ -239,21 +235,19 @@ FUN = r"""
 FUN_JS = r"""
 <script>
 const FUN_FACTS = [
-  "Wenn du einen Goldfisch in einen dunklen Raum stellst, wird er blasser – Mood.",
   "Kühe haben beste Freunde und werden gestresst, wenn man sie trennt. 🐮❤️",
-  "In der Schweiz ist es illegal, nur ein Meerschweinchen zu besitzen – sie sind offiziell zu einsam alleine.",
   "Seesterne haben kein Gehirn – und trotzdem mehr Urlaubsfotos als wir.",
-  "Schnecken haben über 14.000 Zähne. Stell dir vor, die hätten Zahnseide-Influencer.",
-  "Raben merken sich Gesichter – vergiss nie, wem du dein Brot geklaut hast. 🐦",
-  "Tintenfische können mit ihren Armen schmecken. Handschuhpflicht beim Kochen?",
+  "Schnecken haben über 14.000 Zähne. Stell dir die Zahnarztrechnung vor.",
+  "Raben merken sich Gesichter. Sei nett – sie haben gutes Gedächtnis.",
   "Pinguine machen Heiratsanträge mit Kieselsteinen. 💍🐧",
-  "Die Erdnuss ist keine Nuss. Und die Erdbeere keine Beere. Willkommen in der Lügenküche.",
-  "Koalas schlafen bis zu 22 Stunden am Tag. Ein Tier nach meinem Herzen. 😴",
-  "Faultiere können beim Klettern einschlafen. Produktivität: 0, Niedlichkeit: 100.",
-  "Eine Wolke kann mehr als eine Million Kilo wiegen – und ich beschwere mich über meine Einkäufe.",
-  "Hummer werden nie alt im klassischen Sinn – aber sehr teuer.",
-  "Bananen sind leicht radioaktiv. Superkräfte leider nicht inklusive.",
+  "Die Erdnuss ist keine Nuss. Die Erdbeere keine Beere. Trau niemandem.",
+  "Koalas schlafen bis zu 22 Stunden am Tag. Produktivität optional.",
+  "Faultiere können beim Klettern einschlafen. Relatable.",
+  "Eine Wolke kann über eine Million Kilo wiegen – Gains.",
   "In Norwegen gibt es einen Pinguin mit Offiziersrang.",
+  "Tintenfische schmecken mit den Armen. Handschuhe empfohlen.",
+  "Bananen sind leicht radioaktiv. Superkräfte leider nicht inklusive.",
+  "Katzen haben über 20 Ohrmuskeln. Um dich besser zu ignorieren.",
 ];
 const favKey='fun_favs_v1';
 function getFavs(){ try{return JSON.parse(localStorage.getItem(favKey)||'[]')}catch(e){return[]} }
@@ -283,7 +277,6 @@ renderFavs(); newFact();
 </script>
 """
 
-# ---------- TicTacToe Seite ----------
 TTT = r"""
 <section id="tictactoe" class="section">
   <h2 class="title">❌⭕ Tic-Tac-Toe</h2>
@@ -386,12 +379,10 @@ renderBoard();
 </script>
 """
 
-# ---------- Casino Seite ----------
 CASINO = r"""
 <section id="casino" class="section">
   <h2 class="title">🎰 Casino</h2>
 
-  <!-- Balance & Codes NUR im Casino -->
   <div class="card" style="margin-bottom:16px">
     <div class="row" style="width:100%">
       <div>Guthaben: <b><span id="balance2">0</span> A$</b></div>
@@ -460,7 +451,7 @@ CASINO = r"""
       <div class="roulette-wrap">
         <div class="wheel" id="rl-wheel">
           <div class="wheel-disc"></div>
-          <!-- Labels werden per JS erzeugt -->
+          <!-- Labels kommen per JS -->
           <div class="ball" id="rl-ball"></div>
           <div class="pointer"></div>
         </div>
@@ -475,7 +466,7 @@ CASINO = r"""
 
 CASINO_JS = r"""
 <script>
-/* Tabs */
+/* Tabs umschalten */
 document.querySelectorAll('.tab-btn').forEach(b=>{
   b.addEventListener('click', ()=>{
     document.querySelectorAll('.tab-btn').forEach(x=>x.classList.remove('is-active'));
@@ -508,38 +499,70 @@ document.querySelectorAll('.tab-btn').forEach(b=>{
   function val(c){ if(c.r==='A')return 11; if(['K','Q','J'].includes(c.r))return 10; return Number(c.r); }
   function total(h){ let t=h.reduce((s,c)=>s+val(c),0); let ac=h.filter(c=>c.r==='A').length; while(t>21&&ac>0){t-=10;ac--;} return t; }
   function renderCard(c,down=false){ if(down) return `<div class="card-back"></div>`; const red=(c.s==='♥'||c.s==='♦')?' red':''; return `<div class="card-ui${red}"><div class="rank">${c.r}</div><div class="suit">${c.s}</div></div>`; }
-  function render(){
-    elPlayer.innerHTML=player.map(renderCard).join(''); elPT.textContent=total(player);
-    if(dealerHidden&&dealer.length){ elDealer.innerHTML=renderCard(dealer[0],true)+dealer.slice(1).map(renderCard).join(''); elDT.textContent='–'; }
-    else{ elDealer.innerHTML=dealer.map(renderCard).join(''); elDT.textContent=total(dealer); }
+  function renderHands(){
+    // Spieler
+    elPlayer.innerHTML = player.map(c=>renderCard(c,false)).join('');
+    elPT.textContent = total(player);
+    // Dealer
+    if(dealerHidden){
+      elDealer.innerHTML = renderCard(dealer[0],true) + dealer.slice(1).map(c=>renderCard(c,false)).join('');
+      elDT.textContent = '–';
+    }else{
+      elDealer.innerHTML = dealer.map(c=>renderCard(c,false)).join('');
+      elDT.textContent = total(dealer);
+    }
   }
-  function setUI(r){ btnHit.disabled=!r; btnStand.disabled=!r; }
+  function setUI(active){ btnHit.disabled=!active; btnStand.disabled=!active; }
   function canBet(){ const b=Number(betInput.value||0); return b>=1 && b<=getBalance(); }
 
   function startRound(){
     if(!canBet()){ msg.textContent='Nicht genug Guthaben oder ungültiger Einsatz.'; return; }
-    setUI(true); msg.textContent=''; inRound=true; dealerHidden=true;
-    if(deck.length<40) deck=newDeck();
-    dealer=[deck.pop(),deck.pop()]; player=[deck.pop(),deck.pop()]; render();
+    const b=Number(betInput.value); setBalance(getBalance()-b);
+    msg.textContent=''; inRound=true; dealerHidden=true;
 
-    // Beide Hände haben 2 Karten sichtbar; nur Dealer erste verdeckt
-    if(total(player)===21 && total(dealer)===21){ dealerHidden=false; render(); msg.textContent='Beide Blackjack – Push.'; inRound=false; setUI(false); return; }
-    if(total(player)===21){ dealerHidden=false; render(); const win=Math.floor(Number(betInput.value)*1.5); setBalance(getBalance()+Number(betInput.value)+win); msg.textContent=`Blackjack! Gewinn: ${win} A$`; inRound=false; setUI(false); return; }
+    if(deck.length<40) deck=newDeck();
+    dealer=[deck.pop(),deck.pop()];
+    player=[deck.pop(),deck.pop()];
+    setUI(true);
+    renderHands();
+
+    // Sofortige Blackjacks prüfen
+    const pt=total(player), dt=total(dealer);
+    if(pt===21 || dt===21){
+      dealerHidden=false;
+      renderHands();
+      if(pt===21 && dt===21){ msg.textContent='Beide Blackjack – Push.'; setBalance(getBalance()+b); }
+      else if(pt===21){ const win=Math.floor(b*1.5); msg.textContent=`Blackjack! Gewinn: ${win} A$`; setBalance(getBalance()+b+win); }
+      else { msg.textContent='Dealer hat Blackjack – verloren.'; }
+      inRound=false; setUI(false);
+    }
   }
-  function dealerPlay(){ dealerHidden=false; render(); while(total(dealer)<17){ dealer.push(deck.pop()); render(); } }
+
+  function dealerPlay(){
+    dealerHidden=false; renderHands();
+    while(total(dealer)<17){ dealer.push(deck.pop()); renderHands(); }
+  }
   function finishRound(){
-    const p=total(player), d=total(dealer), bet=Number(betInput.value);
+    const b=Number(betInput.value);
+    const p=total(player), d=total(dealer);
     if(p>21){ msg.textContent='Bust! Verloren.'; inRound=false; setUI(false); return; }
-    if(d>21){ msg.textContent='Dealer bust – du gewinnst!'; setBalance(getBalance()+bet*2); inRound=false; setUI(false); return; }
-    if(p>d){ msg.textContent='Du gewinnst!'; setBalance(getBalance()+bet*2); }
+    if(d>21){ msg.textContent='Dealer bust – du gewinnst!'; setBalance(getBalance()+b*2); inRound=false; setUI(false); return; }
+    if(p>d){ msg.textContent='Du gewinnst!'; setBalance(getBalance()+b*2); }
     else if(p<d){ msg.textContent='Verloren.'; }
-    else { msg.textContent='Push – Einsatz zurück.'; setBalance(getBalance()+bet); }
+    else { msg.textContent='Push – Einsatz zurück.'; setBalance(getBalance()+b); }
     inRound=false; setUI(false);
   }
 
-  btnDeal?.addEventListener('click', ()=>{ const b=Number(betInput.value||0); if(b<1){ msg.textContent='Einsatz angeben.'; return; } if(b>getBalance()){ msg.textContent='Nicht genug Guthaben.'; return; } setBalance(getBalance()-b); startRound(); });
-  btnHit?.addEventListener('click', ()=>{ if(!inRound)return; player.push(deck.pop()); render(); if(total(player)>21){ dealerHidden=false; render(); msg.textContent='Bust! Verloren.'; inRound=false; setUI(false); } });
-  btnStand?.addEventListener('click', ()=>{ if(!inRound)return; dealerPlay(); finishRound(); });
+  btnDeal?.addEventListener('click', ()=>{ if(inRound)return; startRound(); });
+  btnHit?.addEventListener('click', ()=>{
+    if(!inRound)return;
+    player.push(deck.pop()); renderHands();
+    if(total(player)>21){ dealerHidden=false; renderHands(); msg.textContent='Bust! Verloren.'; inRound=false; setUI(false); }
+  });
+  btnStand?.addEventListener('click', ()=>{
+    if(!inRound)return;
+    dealerPlay(); finishRound();
+  });
 
   deck=newDeck();
 })();
@@ -560,15 +583,14 @@ document.querySelectorAll('.tab-btn').forEach(b=>{
   const redNums=new Set([1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36]);
   const color=n=> n===0?'grün':(redNums.has(n)?'rot':'schwarz');
 
-  // Labels (0–36) rund ums Rad
+  // Zahl-Labels erzeugen (0–36)
   function buildLabels(){
-    // Entferne alte
     [...wheelEl.querySelectorAll('.wheel-label')].forEach(n=>n.remove());
     const total=37, step=360/total;
     for(let i=0;i<total;i++){
       const lab=document.createElement('div');
       lab.className='wheel-label';
-      const ang=i*step; // Grad
+      const ang=i*step;
       lab.style.transform=`rotate(${ang}deg)`;
       lab.style.setProperty('--r-rev', `${-ang}deg`);
       const span=document.createElement('span');
@@ -586,79 +608,74 @@ document.querySelectorAll('.tab-btn').forEach(b=>{
 
   function canBet(){ const b=Number(betInp.value||0); return b>=1 && b<=getBalance(); }
 
-  let currentWheel=0, currentBall=0; // Startwinkel
+  let currentWheel=0, currentBall=0;
   const step=360/37;
-  const ballRadius=130; // px vom Mittelpunkt
+  const ballRadius=130;
 
   function setTransforms(wDeg, bDeg){
     wheelEl.style.transform = `rotate(${wDeg}deg)`;
     ballEl.style.transform  = `rotate(${bDeg}deg) translateX(${ballRadius}px)`;
   }
-  // Reset initial
-  setTransforms(0, 0);
+  setTransforms(0,0);
 
   function spin(){
     if(!canBet()){ msg.textContent='Nicht genug Guthaben oder ungültiger Einsatz.'; return; }
     msg.textContent=''; const bet=Number(betInp.value); setBalance(getBalance()-bet);
 
     const target=Math.floor(Math.random()*37);
-    const base=360*6;
-    const wheelRot=currentWheel + base + step*target;
-    const ballRot =currentBall  - (base*1.4 + step*target);
+    // Wir richten am Ende so aus, dass der Pointer (oben) GENAU auf der Zielzahl steht.
+    const baseTurns=360*6;  // volle Drehungen fürs Feeling
+    const targetAngle = (360 - target*step); // Ziel unter dem Pointer (0deg)
+    const finalWheel = currentWheel + baseTurns + targetAngle;
+    const finalBall  = currentBall  - (baseTurns*1.4); // gegenläufig
 
-    // Animate
     wheelEl.style.transition='transform 3.2s cubic-bezier(.22,.61,.36,1)';
     ballEl .style.transition='transform 3.2s cubic-bezier(.22,.61,.36,1)';
-    setTransforms(wheelRot, ballRot);
+    setTransforms(finalWheel, finalBall);
 
     setTimeout(()=>{
-      // Ergebnis
+      // Ergebnis anzeigen
       resEl.textContent=String(target);
       const c=color(target); colEl.textContent=c;
-      const t=typeSel.value; let win=0;
 
+      const t=typeSel.value; let win=0;
       if(t==='single'){ const n=Number(numInp.value); if(n===target) win=bet*35; }
       else if(t==='red' && c==='rot') win=bet;
       else if(t==='black' && c==='schwarz') win=bet;
       else if(t==='even' && target!==0 && target%2===0) win=bet;
       else if(t==='odd' && target%2===1) win=bet;
-      else if(t==='dozen1' && target>=1 && target<=12) win=bet*3;   // VERDREIFACHEN
-      else if(t==='dozen2' && target>=13 && target<=24) win=bet*3;  // VERDREIFACHEN
-      else if(t==='dozen3' && target>=25 && target<=36) win=bet*3;  // VERDREIFACHEN
+      else if(t==='dozen1' && target>=1 && target<=12) win=bet*3;
+      else if(t==='dozen2' && target>=13 && target<=24) win=bet*3;
+      else if(t==='dozen3' && target>=25 && target<=36) win=bet*3;
 
       if(win>0){ setBalance(getBalance()+bet+win); msg.textContent=`Gewonnen: +${win} A$`; }
       else{ msg.textContent='Leider verloren.'; }
 
-      // Clean reset: Transition aus, Winkel auf Mod 360 reduzieren, Reflow, dann Setzen
+      // Sauberer Reset: Winkel normieren und ohne Transition setzen
       setTimeout(()=>{
-        currentWheel = (wheelRot % 360 + 360) % 360;
-        currentBall  = (ballRot  % 360 + 360) % 360;
-        wheelEl.style.transition='none';
-        ballEl .style.transition='none';
-        // auf Endwinkel (modulo) setzen
+        currentWheel = (finalWheel % 360 + 360) % 360;
+        currentBall  = (finalBall  % 360 + 360) % 360;
+        wheelEl.style.transition='none'; ballEl.style.transition='none';
+        // Kugel genau zum Pointer (oben) – leicht versetzt, damit sie sichtbar vor dem Label liegt
+        currentBall = 0;
         setTransforms(currentWheel, currentBall);
-        // Reflow erzwingen
-        void wheelEl.offsetWidth;
-        void ballEl.offsetWidth;
+        void wheelEl.offsetWidth; void ballEl.offsetWidth; // reflow
       }, 100);
     }, 3300);
   }
   spinBtn?.addEventListener('click', spin);
 
-  // Balance-Zahl auch hier aktualisieren
   document.getElementById('balance2').textContent = getBalance();
-  // Redeem-Button hier aktivieren (nur Casino hat das Feld)
   document.getElementById('redeem')?.addEventListener('click', redeem);
 })();
 </script>
 """
 
+# ========================= Render helper =========================
 def render_page(title, content_html, page_js=""):
-    return render_template_string(
-        BASE, title=title, content=content_html, page_js=page_js
-    )
+    return render_template_string(BASE, title=title, content=content_html, page_js=page_js)
 
-# ---------- Routes ----------
+# ========================= Routes =========================
 @app.route("/")
 def home():
     return render_page("Start · Aaron", HOME, "")
@@ -675,6 +692,5 @@ def tictactoe():
 def casino():
     return render_page("Casino · Aaron", CASINO, CASINO_JS)
 
-# ---------- Run ----------
 if __name__ == "__main__":
-  app.run(debug=True)
+    app.run(debug=True)
