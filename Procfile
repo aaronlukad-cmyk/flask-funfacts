@@ -1,1 +1,2 @@
-web: gunicorn app:app
+flask==3.*
+gunicorn
