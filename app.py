@@ -423,46 +423,330 @@ CASINO = r"""
     </div>
   </div>
 
-  <!-- ROULETTE -->
-  <div class="tab-panel" id="tab-roulette">
-    <div class="card" style="gap:16px">
-      <div class="row" style="flex-wrap:wrap">
-        <label>Einsatz:
-          <input id="rl-bet" type="number" min="1" step="1" value="10" style="width:100px"> A$
-        </label>
-        <label>Wette:
-          <select id="rl-type">
-            <option value="single">Zahl (0–36)</option>
-            <option value="red">Rot</option>
-            <option value="black">Schwarz</option>
-            <option value="even">Gerade</option>
-            <option value="odd">Ungerade</option>
-            <option value="dozen1">1st 12 (1–12)</option>
-            <option value="dozen2">2nd 12 (13–24)</option>
-            <option value="dozen3">3rd 12 (25–36)</option>
-          </select>
-        </label>
-        <label id="rl-number-wrap">Zahl:
-          <input id="rl-number" type="number" min="0" max="36" value="7" style="width:80px">
-        </label>
-        <button id="rl-spin" class="btn">🎡 Spin</button>
-      </div>
-
-      <div class="roulette-wrap">
-        <div class="wheel" id="rl-wheel">
-          <div class="wheel-disc"></div>
-          <!-- Labels kommen per JS -->
-          <div class="ball" id="rl-ball"></div>
-          <div class="pointer"></div>
-        </div>
-      </div>
-
-      <div>Ergebnis: Zahl <b><span id="rl-result">–</span></b>, Farbe <b><span id="rl-color">–</span></b></div>
-      <div id="rl-msg" class="msg muted"></div>
-    </div>
+ <!-- ROULETTE START -->
+<div class="tab" id="rouletteTab" style="display:none">
+  <div class="row" style="gap:10px;align-items:center;margin-top:6px;">
+    <label for="roulStake">Einsatz:</label>
+    <input id="roulStake" type="number" min="1" value="10" style="width:90px"> <span>A$</span>
   </div>
-</section>
-"""
+
+  <div class="row" style="gap:10px;align-items:center;margin-top:8px;">
+    <label for="roulType">Wette:</label>
+    <select id="roulType">
+      <option value="number">Zahl (0–36)</option>
+      <option value="color">Farbe (rot/schwarz)</option>
+      <option value="parity">Gerade/Ungerade</option>
+      <option value="dozen">Dutzend (1–12 / 13–24 / 25–36)</option>
+      <option value="third">1/2/3-Feld</option>
+    </select>
+
+    <span id="roulExtraWrap" class="row" style="gap:6px;align-items:center;">
+      <label for="roulExtra">Zahl:</label>
+      <select id="roulExtra"></select>
+    </span>
+  </div>
+
+  <button id="roulSpin" class="btn" style="margin-top:10px;">🎲 Spin</button>
+
+  <div style="display:flex;justify-content:center;margin-top:14px;">
+    <canvas id="roulCanvas" width="420" height="420"></canvas>
+  </div>
+
+  <div id="roulResult" style="margin-top:12px;font-weight:600;"></div>
+</div>
+
+<script>
+(() => {
+  // --------- KONFIG ---------
+  const canvas   = document.getElementById('roulCanvas');
+  const ctx      = canvas.getContext('2d');
+  const spinBtn  = document.getElementById('roulSpin');
+  const stakeEl  = document.getElementById('roulStake');
+  const typeEl   = document.getElementById('roulType');
+  const extraWrap= document.getElementById('roulExtraWrap');
+  const extraEl  = document.getElementById('roulExtra');
+  const resultEl = document.getElementById('roulResult');
+
+  // Wenn deine Seite eine globale Balance-Funktion hat, benutzen wir sie:
+  const hasAddBalance = typeof window.addBalance === 'function';
+  const hasGetBalance = typeof window.getBalance  === 'function';
+
+  // Europäische Reihenfolge (0, 32,15,...) – 37 Fächer
+  const order = [0,32,15,19,4,21,2,25,17,34,6,27,13,36,11,30,8,23,10,5,24,16,
+                 33,1,20,14,31,9,22,18,29,7,28,12,35,3,26];
+  const n      = order.length;      // 37
+  const segAng = 2*Math.PI / n;     // Segmentwinkel
+  const angleOffset = -Math.PI/2;   // 0 am oberen Zeiger
+
+  let currentAngle = 0;             // aktuelle Rad-Orientation
+  let spinning = false;
+
+  // Farben
+  const RED   = '#d43a3a';
+  const BLACK = '#111821';
+  const GREEN = '#0f8a2a';
+
+  // ---------- Auswahllisten ----------
+  function fillExtra() {
+    extraEl.innerHTML = '';
+    if (typeEl.value === 'number') {
+      for (let i=0;i<=36;i++){
+        const o = document.createElement('option');
+        o.value=o.textContent=i;
+        extraEl.appendChild(o);
+      }
+      extraWrap.querySelector('label').textContent = 'Zahl:';
+      extraWrap.style.display = 'flex';
+    } else if (typeEl.value === 'color') {
+      ['rot','schwarz'].forEach(v=>{
+        const o = document.createElement('option');
+        o.value=v; o.textContent=v;
+        extraEl.appendChild(o);
+      });
+      extraWrap.querySelector('label').textContent = 'Farbe:';
+      extraWrap.style.display = 'flex';
+    } else if (typeEl.value === 'parity') {
+      [['even','gerade'],['odd','ungerade']].forEach(([v,t])=>{
+        const o=document.createElement('option');
+        o.value=v; o.textContent=t;
+        extraEl.appendChild(o);
+      });
+      extraWrap.querySelector('label').textContent = 'Art:';
+      extraWrap.style.display = 'flex';
+    } else if (typeEl.value === 'dozen') {
+      [['1','1–12'],['2','13–24'],['3','25–36']].forEach(([v,t])=>{
+        const o=document.createElement('option');
+        o.value=v; o.textContent=t;
+        extraEl.appendChild(o);
+      });
+      extraWrap.querySelector('label').textContent = 'Dutzend:';
+      extraWrap.style.display = 'flex';
+    } else if (typeEl.value === 'third') {
+      // 1/2/3-Feld
+      [['1','1'],['2','2'],['3','3']].forEach(([v,t])=>{
+        const o=document.createElement('option');
+        o.value=v; o.textContent=t;
+        extraEl.appendChild(o);
+      });
+      extraWrap.querySelector('label').textContent = 'Feld:';
+      extraWrap.style.display = 'flex';
+    }
+  }
+  typeEl.addEventListener('change', fillExtra);
+  fillExtra();
+
+  // ---------- Zeichnen ----------
+  function isRed(num){
+    // Standard Rot-Schwarz Verteilung
+    return [1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36].includes(num);
+  }
+
+  function drawWheel(angle, highlightIndex=null){
+    const {width, height} = canvas;
+    const cx = width/2, cy=height/2;
+    const outerR = Math.min(cx,cy) - 8;
+    const innerR = outerR * 0.78;
+
+    ctx.clearRect(0,0,width,height);
+
+    // Segmente
+    for (let i=0;i<n;i++){
+      const num = order[i];
+      const start = angleOffset + angle + i*segAng;
+      const end   = start + segAng;
+
+      ctx.beginPath();
+      ctx.moveTo(cx,cy);
+      ctx.arc(cx,cy,outerR,start,end);
+      ctx.closePath();
+
+      if (num===0) ctx.fillStyle = GREEN;
+      else ctx.fillStyle = isRed(num) ? RED : BLACK;
+      ctx.fill();
+
+      // Trennlinie
+      ctx.strokeStyle = '#0e1320';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(cx,cy,outerR,start,end);
+      ctx.stroke();
+
+      // Nummern
+      const middle = (start+end)/2;
+      ctx.save();
+      ctx.translate(cx + Math.cos(middle)*(innerR+6),
+                    cy + Math.sin(middle)*(innerR+6));
+      ctx.rotate(middle + Math.PI/2);
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 14px ui-sans-serif, system-ui';
+      ctx.textAlign='center';
+      ctx.textBaseline='middle';
+      ctx.fillText(String(num), 0, 0);
+      ctx.restore();
+    }
+
+    // innerer Kreis
+    ctx.beginPath();
+    ctx.arc(cx,cy,innerR,0,2*Math.PI);
+    ctx.fillStyle = '#0b0f18';
+    ctx.fill();
+
+    // Zeiger oben
+    ctx.fillStyle='#ffd147';
+    ctx.beginPath();
+    ctx.moveTo(cx, cy-outerR-3);
+    ctx.lineTo(cx-10, cy-outerR+20);
+    ctx.lineTo(cx+10, cy-outerR+20);
+    ctx.closePath();
+    ctx.fill();
+
+    // Ball – steht immer beim Zeiger oben (zeigt das Gewinnfeld),
+    // aber wir zeichnen ihn NACH dem Rad, damit er sichtbar über den Zahlen liegt
+    const ballR = 8;
+    const ballX = cx;
+    const ballY = cy - (innerR + (outerR-innerR)/2);
+    ctx.beginPath();
+    ctx.arc(ballX, ballY, ballR, 0, 2*Math.PI);
+    ctx.fillStyle = '#ffffff';
+    ctx.shadowColor = 'rgba(255,255,255,0.7)';
+    ctx.shadowBlur = 6;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // optional: Highlight des Zielsegments
+    if (highlightIndex!==null){
+      ctx.beginPath();
+      const s = angleOffset + angle + highlightIndex*segAng;
+      const e = s + segAng;
+      ctx.arc(cx,cy,outerR, s, e);
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = '#ffd147';
+      ctx.stroke();
+    }
+  }
+
+  // Start-Zeichnung
+  drawWheel(currentAngle);
+
+  // ---------- Logik / Auszahlen ----------
+  function pocketIndexForNumber(num){
+    return order.indexOf(num);
+  }
+
+  // Hilfsfunktion: (0..2π)
+  function norm(a){ a = a % (2*Math.PI); return a<0 ? a + 2*Math.PI : a; }
+
+  function checkWin(winNum, type, extra){
+    // gibt den Multiplikator zurück (inkl. Einsatz)
+    // Zahl (0–36): 36x (→ Gewinn 35x)
+    // Farbe / Gerade: 2x (→ Gewinn 1x)
+    // Dutzend: 3x (→ Gewinn 2x)
+    // 1/2/3-Feld: 3x (wie gewünscht)
+    if (type==='number'){
+      return (parseInt(extra,10)===winNum) ? 36 : 0;
+    }
+    if (type==='color'){
+      if (winNum===0) return 0;
+      const wanted = extra; // 'rot'|'schwarz'
+      const isRedN = isRed(winNum);
+      return (wanted==='rot' && isRedN) || (wanted==='schwarz' && !isRedN) ? 2 : 0;
+    }
+    if (type==='parity'){
+      if (winNum===0) return 0;
+      const even = (winNum%2===0);
+      return (extra==='even' && even) || (extra==='odd' && !even) ? 2 : 0;
+    }
+    if (type==='dozen'){
+      const doz = parseInt(extra,10); // 1,2,3
+      if (winNum===0) return 0;
+      const inDoz = (doz===1 && winNum>=1 && winNum<=12) ||
+                    (doz===2 && winNum>=13 && winNum<=24) ||
+                    (doz===3 && winNum>=25 && winNum<=36);
+      return inDoz ? 3 : 0;
+    }
+    if (type==='third'){
+      // 1/2/3-Feld – wir interpretieren das als „Drittel des Kreises“ (wie 1st/2nd/3rd),
+      // Gewinnfaktor 3x (inkl. Einsatz)
+      if (winNum===0) return 0;
+      const t = parseInt(extra,10);
+      const group1 = [1,4,7,10,13,16,19,22,25,28,31,34];
+      const group2 = [2,5,8,11,14,17,20,23,26,29,32,35];
+      const group3 = [3,6,9,12,15,18,21,24,27,30,33,36];
+      const inGroup = (t===1 && group1.includes(winNum)) ||
+                      (t===2 && group2.includes(winNum)) ||
+                      (t===3 && group3.includes(winNum));
+      return inGroup ? 3 : 0;
+    }
+    return 0;
+  }
+
+  function formatA(amount){
+    return (amount>0?'+':'') + amount + ' A$';
+  }
+
+  // ---------- Spin ----------
+  spinBtn.addEventListener('click', () => {
+    if (spinning) return;
+    const stake = Math.max(1, parseInt(stakeEl.value||'1',10));
+    if (hasGetBalance && hasAddBalance){
+      const bal = window.getBalance();
+      if (bal < stake){ resultEl.textContent = 'Zu wenig Guthaben.'; return; }
+      window.addBalance(-stake);
+    }
+    resultEl.textContent = '... dreht ...';
+
+    // Zielzahl festlegen (zufällig oder passend zur Wette – hier zufällig)
+    const winningIndex = Math.floor(Math.random()*n);
+    const winningNumber= order[winningIndex];
+
+    // Wir berechnen den Zielwinkel so, dass das Segment winningIndex
+    // exakt am oberen Zeiger (angleOffset) landet:
+    // Bedingung: angleOffset + final + winningIndex*segAng = angleOffset  (mod 2π)
+    // -> final = -winningIndex*segAng (mod 2π)
+    const baseFinal = norm(-winningIndex*segAng);
+    const revolutions = 4 + Math.floor(Math.random()*2); // 4–5 Umdrehungen
+    const targetAngle = baseFinal + revolutions * 2*Math.PI;
+
+    const duration = 2500; // ms
+    const start = performance.now();
+    const startAngle = currentAngle;
+    spinning = true;
+
+    (function animate(t){
+      const p = Math.min(1, (t-start)/duration);
+      // easeOutCubic
+      const eased = 1 - Math.pow(1-p, 3);
+      const a = startAngle + (targetAngle - startAngle)*eased;
+      currentAngle = a;
+      drawWheel(currentAngle);
+      if (p<1) requestAnimationFrame(animate);
+      else {
+        spinning = false;
+        currentAngle = norm(targetAngle);
+        drawWheel(currentAngle, winningIndex); // Highlight
+
+        // Auswertung
+        const type  = typeEl.value;
+        const extra = (extraEl.value || '');
+        const mult  = checkWin(winningNumber, type, extra);
+        const won   = mult ? stake * mult : 0;
+        if (won && hasAddBalance) window.addBalance(won);
+
+        // Text
+        let txt = `Ergebnis: Zahl ${winningNumber}, Farbe ${winningNumber===0?'grün':(isRed(winningNumber)?'rot':'schwarz')}`;
+        if (won){
+          txt += ` — Gewonnen: ${formatA(won - stake)} (Auszahlung ${mult}× inkl. Einsatz)`;
+        } else {
+          txt += ` — Leider verloren.`;
+        }
+        resultEl.textContent = txt;
+      }
+    })(start);
+  });
+})();
+</script>
+<!-- ROULETTE END -->
+
 
 CASINO_JS = r"""
 <script>
@@ -694,3 +978,4 @@ def casino():
 
 if __name__ == "__main__":
     app.run(debug=True)
+
