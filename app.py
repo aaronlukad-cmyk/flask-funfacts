@@ -173,7 +173,7 @@ const REDEEM_CODES = {
   "ARMIN": 101,
   "COMET": 200,
   "RIVER": 200,
-  "Liv": 1000000000000000000000,
+  "LIV": 1000000000000000000000,
   "MOUNTAIN": 200,
   "FALCON": 75,
   "ORBIT": 75,
@@ -695,4 +695,5 @@ def casino():
 
 if __name__ == "__main__":
     app.run(debug=True)
+
 
